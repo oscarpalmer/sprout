@@ -18,6 +18,18 @@
 			"import": "./dist/index.mjs",
 			"require": "./dist/index.js",
 			"types": "./types/index.d.ts"
+		},
+		"./controller": {
+			"bun": "./src/controller/index.ts",
+			"import": "./dist/controller/index.mjs",
+			"require": "./dist/controller/index.js",
+			"types": "./types/controller/index.d.ts"
+		},
+		"./html": {
+			"bun": "./src/html/index.ts",
+			"import": "./dist/html/index.mjs",
+			"require": "./dist/html/index.js",
+			"types": "./types/html/index.d.ts"
 		}
 	},
 	"files": [
@@ -41,5 +53,5 @@
 	},
 	"type": "module",
 	"types": "./types/index.d.ts",
-	"version": "0.1.0"
+	"version": "0.2.0"
 }
