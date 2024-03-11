@@ -1,10 +1,4 @@
-// src/controller/index.ts
-function controller(name, value) {
-  if (constructors.has(name)) {
-    throw new Error(`Controller '${name}' already exists`);
-  }
-  constructors.set(name, value);
-}
+// src/petal/index.ts
 var getAttributes = function(from, to) {
   const fromValues = from.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
   const toValues = to.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
@@ -32,20 +26,27 @@ var observer = function(mutations) {
     }
   }
 };
+function petal(name, bud) {
+  if (buds.has(name)) {
+    throw new Error(`Petal '${name}' already exists`);
+  }
+  buds.set(name, bud);
+}
 var update = function(element, from) {
-  const attributes = getAttributes(from, element.getAttribute("data-controller") ?? "");
-  let elementControllers = controllers.get(element);
+  const attributes = getAttributes(from, element.getAttribute(attribute) ?? "");
+  let elementControllers = petals.get(element);
   if (elementControllers === undefined) {
     elementControllers = new Set;
-    controllers.set(element, elementControllers);
+    petals.set(element, elementControllers);
   }
   let { length } = attributes[0];
   let index = 0;
   for (;index < length; index += 1) {
     const name = attributes[0][index];
-    const cnstrctr = constructors.get(name);
-    const existing = Array.from(elementControllers).find((value) => value.constructor === cnstrctr);
+    const bud = buds.get(name);
+    const existing = Array.from(elementControllers).find((value) => value.constructor === bud);
     if (existing !== undefined) {
+      existing.disconnected();
       elementControllers.delete(existing);
     }
   }
@@ -53,25 +54,31 @@ var update = function(element, from) {
   index = 0;
   for (;index < length; index += 1) {
     const name = attributes[1][index];
-    const cnstrctr = constructors.get(name);
-    const none = Array.from(elementControllers).findIndex((value) => value.constructor === cnstrctr) === -1;
-    if (cnstrctr !== undefined && none) {
-      const controller2 = new cnstrctr(element);
-      elementControllers.add(controller2);
+    const bud = buds.get(name);
+    const none = Array.from(elementControllers).findIndex((value) => value.constructor === bud) === -1;
+    if (bud !== undefined && none) {
+      const petal2 = new bud(element);
+      petal2.connected();
+      elementControllers.add(petal2);
     }
   }
 };
 
-class Controller {
+class Petal {
   element;
   constructor(element) {
     this.element = element;
   }
+  connected() {
+  }
+  disconnected() {
+  }
 }
-var constructors = new Map;
-var controllers = new Map;
+var attribute = "data-petal";
+var buds = new Map;
+var petals = new Map;
 var options = {
-  attributeFilter: ["data-controller"],
+  attributeFilter: [attribute],
   attributeOldValue: true,
   attributes: true,
   childList: true,
@@ -79,7 +86,7 @@ var options = {
 };
 new MutationObserver(observer).observe(document, options);
 document.addEventListener("DOMContentLoaded", () => {
-  const elements = document.querySelectorAll("[data-controller]");
+  const elements = document.querySelectorAll(`[${attribute}]`);
   const { length } = elements;
   let index = 0;
   for (;index < length; index += 1) {
@@ -87,6 +94,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 export {
-  controller,
-  Controller
+  petal,
+  Petal
 };

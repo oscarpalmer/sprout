@@ -1,5 +1,8 @@
-export function html(strings: TemplateStringsArray, ...expressions: unknown[]): string {
-	const { length } = strings;
+export function bloom(
+	strings: TemplateStringsArray,
+	...expressions: unknown[]
+): string {
+	const {length} = strings;
 
 	let html = '';
 	let index = 0;

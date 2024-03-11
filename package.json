@@ -4,7 +4,7 @@
 		"url": "https://oscarpalmer.se"
 	},
 	"dependencies": {
-		"@oscarpalmer/atoms": "^0.27"
+		"@oscarpalmer/atoms": "^0.28"
 	},
 	"description": "… sprouting like a cute little weird flower",
 	"devDependencies": {
@@ -19,17 +19,17 @@
 			"require": "./dist/index.js",
 			"types": "./types/index.d.ts"
 		},
-		"./controller": {
-			"bun": "./src/controller/index.ts",
-			"import": "./dist/controller/index.mjs",
-			"require": "./dist/controller/index.js",
-			"types": "./types/controller/index.d.ts"
+		"./bloom": {
+			"bun": "./src/bloom/index.ts",
+			"import": "./dist/bloom/index.mjs",
+			"require": "./dist/bloom/index.js",
+			"types": "./types/bloom/index.d.ts"
 		},
-		"./html": {
-			"bun": "./src/html/index.ts",
-			"import": "./dist/html/index.mjs",
-			"require": "./dist/html/index.js",
-			"types": "./types/html/index.d.ts"
+		"./petal": {
+			"bun": "./src/petal/index.ts",
+			"import": "./dist/petal/index.mjs",
+			"require": "./dist/petal/index.js",
+			"types": "./types/petal/index.d.ts"
 		}
 	},
 	"files": [
@@ -53,5 +53,5 @@
 	},
 	"type": "module",
 	"types": "./types/index.d.ts",
-	"version": "0.2.0"
+	"version": "0.3.0"
 }
