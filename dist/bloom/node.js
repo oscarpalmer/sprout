@@ -87,90 +87,7 @@ class Effect extends Atomic {
   }
 }
 
-// src/bloom/node.ts
-function createNode(value) {
-  if (value instanceof Node) {
-    return value;
-  }
-  if (isBloom(value)) {
-    return value.grow();
-  }
-  return document.createTextNode(String(value));
-}
-function createNodes(html) {
-  const template = document.createElement("template");
-  template.innerHTML = html;
-  const cloned = template.content.cloneNode(true);
-  const scripts = Array.from(cloned instanceof Element ? cloned.querySelectorAll("script") : []);
-  for (const script of scripts) {
-    script.remove();
-  }
-  cloned.normalize();
-  return cloned;
-}
-var getIndex = function(value) {
-  const [, index] = /^bloom\.(\d+)$/.exec(value) ?? [];
-  return index == null ? -1 : +index;
-};
-function mapNodes(values, node) {
-  const children = Array.from(node.childNodes);
-  const { length } = children;
-  let index = 0;
-  for (;index < length; index += 1) {
-    const child = children[index];
-    if (child.nodeType === 8) {
-      setValue(values, child);
-      continue;
-    }
-    if (child instanceof Element) {
-    }
-    if (child.hasChildNodes()) {
-      mapNodes(values, child);
-    }
-  }
-  return node;
-}
-var setFunction = function(comment, callback) {
-  const value = callback();
-  if (isReactive(value)) {
-    setReactive(comment, value);
-  } else {
-    setNode(comment, value);
-  }
-};
-var setNode = function(comment, value) {
-  const node = createNode(value);
-  comment.replaceWith(.../^documentfragment$/i.test(node.constructor.name) ? Array.from(node.childNodes) : [node]);
-};
-var setReactive = function(comment, reactive) {
-  const text = document.createTextNode("");
-  effect(() => {
-    const { value } = reactive;
-    text.textContent = String(value);
-    if (value == null && text.parentNode != null) {
-      text.replaceWith(comment);
-    } else if (value != null && text.parentNode == null) {
-      comment.replaceWith(text);
-    }
-  });
-};
-var setValue = function(values, comment) {
-  const index = getIndex(comment.nodeValue ?? "");
-  const value = values[index];
-  if (value == null) {
-    return;
-  }
-  if (typeof value === "function") {
-    setFunction(comment, value);
-  } else {
-    setNode(comment, value);
-  }
-};
-
 // src/bloom/index.ts
-function bloom2(strings, ...expressions) {
-  return new Bloom(strings, ...expressions);
-}
 var getHtml = function(data) {
   if (data.html.length > 0) {
     return data.html;
@@ -220,7 +137,88 @@ class Bloom {
     return mapNodes(this.data.values, nodes);
   }
 }
+
+// src/bloom/node.ts
+function createNode(value) {
+  if (value instanceof Node) {
+    return value;
+  }
+  if (isBloom(value)) {
+    return value.grow();
+  }
+  return document.createTextNode(String(value));
+}
+function createNodes(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const cloned = template.content.cloneNode(true);
+  const scripts = Array.from(cloned instanceof Element ? cloned.querySelectorAll("script") : []);
+  for (const script of scripts) {
+    script.remove();
+  }
+  cloned.normalize();
+  return cloned;
+}
+var getIndex = function(value) {
+  const [, index] = /^bloom\.(\d+)$/.exec(value) ?? [];
+  return index == null ? -1 : +index;
+};
+function mapNodes(values, node2) {
+  const children = Array.from(node2.childNodes);
+  const { length } = children;
+  let index = 0;
+  for (;index < length; index += 1) {
+    const child = children[index];
+    if (child.nodeType === 8) {
+      setValue(values, child);
+      continue;
+    }
+    if (child instanceof Element) {
+    }
+    if (child.hasChildNodes()) {
+      mapNodes(values, child);
+    }
+  }
+  return node2;
+}
+var setFunction = function(comment, callback) {
+  const value = callback();
+  if (isReactive(value)) {
+    setReactive(comment, value);
+  } else {
+    setNode(comment, value);
+  }
+};
+var setNode = function(comment, value) {
+  const node2 = createNode(value);
+  comment.replaceWith(.../^documentfragment$/i.test(node2.constructor.name) ? Array.from(node2.childNodes) : [node2]);
+};
+var setReactive = function(comment, reactive) {
+  const text = document.createTextNode("");
+  effect(() => {
+    const { value } = reactive;
+    text.textContent = String(value);
+    if (value == null && text.parentNode != null) {
+      text.replaceWith(comment);
+    } else if (value != null && text.parentNode == null) {
+      comment.replaceWith(text);
+    }
+  });
+};
+var setValue = function(values, comment) {
+  const index = getIndex(comment.nodeValue ?? "");
+  const value = values[index];
+  if (value == null) {
+    return;
+  }
+  if (typeof value === "function") {
+    setFunction(comment, value);
+  } else {
+    setNode(comment, value);
+  }
+};
 export {
-  isBloom,
-  bloom2 as bloom
+  mapNodes,
+  createNodes,
+  createNode
 };
