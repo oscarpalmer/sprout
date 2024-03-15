@@ -92,6 +92,26 @@ function isStylableElement(element) {
   return element instanceof HTMLElement || element instanceof SVGElement;
 }
 
+// src/bloom/event.ts
+function addEvent(element, attribute2, value) {
+  element.removeAttribute(attribute2);
+  if (typeof value !== "function") {
+    return;
+  }
+  const parameters = getParameters(attribute2);
+  element.addEventListener(parameters.name, value, parameters.options);
+}
+var getParameters = function(attribute2) {
+  const parts = attribute2.slice(1).toLowerCase().split(":");
+  const name = parts.shift();
+  const options = {
+    capture: parts.includes("capture"),
+    once: parts.includes("once"),
+    passive: !parts.includes("active")
+  };
+  return { name, options };
+};
+
 // src/bloom/attribute.ts
 var getIndex = function(value) {
   const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value) ?? [];
@@ -126,6 +146,7 @@ function mapAttributes(values, element) {
       continue;
     }
     if (attribute2.name.startsWith("@")) {
+      addEvent(element, attribute2.name, value);
     } else {
       const isFunction = typeof value === "function";
       getSetter(attribute2.name, isFunction)?.(element, attribute2.name, isFunction ? value() : attribute2.value);

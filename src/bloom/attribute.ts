@@ -1,5 +1,6 @@
 import {type Effect, isReactive, effect} from '@oscarpalmer/atoms/signal';
 import {isStylableElement} from './node';
+import {addEvent} from './event';
 
 const booleanAttributes = new Set([
 	'checked',
@@ -69,7 +70,7 @@ export function mapAttributes(values: unknown[], element: Element): void {
 		}
 
 		if (attribute.name.startsWith('@')) {
-			// TODO: set event
+			addEvent(element, attribute.name, value);
 		} else {
 			const isFunction = typeof value === 'function';
 
