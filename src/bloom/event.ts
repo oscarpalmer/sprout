@@ -1,4 +1,9 @@
-// TODO: remove events for element
+import {storeNode} from './store';
+
+export type EventData = {
+	element: Element;
+	listener: EventListener;
+} & Parameters;
 
 type Parameters = {
 	name: string;
@@ -19,6 +24,10 @@ export function addEvent(
 	const parameters = getParameters(attribute);
 
 	element.addEventListener(parameters.name, value as never, parameters.options);
+
+	storeNode(element, {
+		event: {element, listener: value as never, ...parameters},
+	});
 }
 
 function getParameters(attribute: string): Parameters {

@@ -15,6 +15,9 @@ var effect = function(callback) {
 var isComputed = function(value) {
   return isInstance(/^computed$/i, value);
 };
+var isEffect = function(value) {
+  return isInstance(/^effect$/i, value);
+};
 var isReactive = function(value) {
   return isComputed(value) || isSignal(value);
 };
@@ -87,6 +90,32 @@ class Effect extends Atomic {
   }
 }
 
+// src/bloom/store.ts
+function storeNode(node2, data) {
+  let stored = store.get(node2);
+  if (stored == null) {
+    stored = {
+      effects: new Set,
+      events: new Map
+    };
+    store.set(node2, stored);
+  }
+  if (data.effect != null) {
+    stored.effects.add(data.effect);
+  }
+  if (data.event != null) {
+    let events = stored.events.get(data.event.name);
+    if (events == null) {
+      events = new Map;
+      stored.events.set(data.event.name, events);
+    }
+    if (!events.has(data.event.listener)) {
+      events.set(data.event.listener, data.event);
+    }
+  }
+}
+var store = new WeakMap;
+
 // src/bloom/node.ts
 function isStylableElement(element) {
   return element instanceof HTMLElement || element instanceof SVGElement;
@@ -100,6 +129,9 @@ function addEvent(element, attribute2, value) {
   }
   const parameters = getParameters(attribute2);
   element.addEventListener(parameters.name, value, parameters.options);
+  storeNode(element, {
+    event: { element, listener: value, ...parameters }
+  });
 }
 var getParameters = function(attribute2) {
   const parts = attribute2.slice(1).toLowerCase().split(":");
@@ -149,7 +181,10 @@ function mapAttributes(values, element) {
       addEvent(element, attribute2.name, value);
     } else {
       const isFunction = typeof value === "function";
-      getSetter(attribute2.name, isFunction)?.(element, attribute2.name, isFunction ? value() : attribute2.value);
+      const fx = getSetter(attribute2.name, isFunction)?.(element, attribute2.name, isFunction ? value() : attribute2.value);
+      if (isEffect(fx)) {
+        storeNode(element, { effect: fx });
+      }
     }
   }
 }

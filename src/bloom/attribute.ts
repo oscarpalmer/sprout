@@ -1,6 +1,12 @@
-import {type Effect, isReactive, effect} from '@oscarpalmer/atoms/signal';
+import {
+	type Effect,
+	isReactive,
+	effect,
+	isEffect,
+} from '@oscarpalmer/atoms/signal';
 import {isStylableElement} from './node';
 import {addEvent} from './event';
+import {storeNode} from './store';
 
 const booleanAttributes = new Set([
 	'checked',
@@ -74,12 +80,15 @@ export function mapAttributes(values: unknown[], element: Element): void {
 		} else {
 			const isFunction = typeof value === 'function';
 
-			// TODO: receive effect and stop when element is removed
-			getSetter(attribute.name, isFunction)?.(
+			const fx = getSetter(attribute.name, isFunction)?.(
 				element,
 				attribute.name,
 				isFunction ? value() : attribute.value,
 			);
+
+			if (isEffect(fx)) {
+				storeNode(element, {effect: fx});
+			}
 		}
 	}
 }

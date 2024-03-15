@@ -1,6 +1,7 @@
 import {type Reactive, isReactive, effect} from '@oscarpalmer/atoms/signal';
 import {isBloom} from '../bloom';
 import {mapAttributes} from './attribute';
+import { storeNode } from './store';
 
 export function createNode(value: unknown): Node {
 	if (value instanceof Node) {
@@ -96,8 +97,7 @@ function setNode(comment: Comment, value: unknown): void {
 function setReactive(comment: Comment, reactive: Reactive): void {
 	const text = document.createTextNode('');
 
-	// TODO: stop effects when element is removed
-	effect(() => {
+	const fx = effect(() => {
 		const {value} = reactive;
 
 		text.textContent = String(value);
@@ -108,6 +108,9 @@ function setReactive(comment: Comment, reactive: Reactive): void {
 			comment.replaceWith(text);
 		}
 	});
+
+	storeNode(comment, {effect: fx});
+	storeNode(text, {effect: fx});
 }
 
 function setValue(values: unknown[], comment: Comment): void {
