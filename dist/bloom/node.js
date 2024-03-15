@@ -138,6 +138,123 @@ class Bloom {
   }
 }
 
+// src/bloom/attribute.ts
+var getIndex = function(value) {
+  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value) ?? [];
+  return index == null ? -1 : +index;
+};
+var getSetter = function(name, allowAny) {
+  switch (true) {
+    case booleanAttributes.has(name.toLowerCase()):
+      return setBoolean;
+    case /^class\.\w/.test(name):
+      return setClasses;
+    case /^style\.\w/.test(name):
+      return setStyle;
+    default:
+      return allowAny ? setAny : undefined;
+  }
+};
+var isBadAttribute = function(attribute) {
+  const { name, value } = attribute;
+  return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value);
+};
+function mapAttributes(values, element) {
+  const attributes = Array.from(element.attributes);
+  const { length } = attributes;
+  let index = 0;
+  for (;index < length; index += 1) {
+    const attribute = attributes[index];
+    const value = values[getIndex(attribute.value)];
+    const badAttribute = isBadAttribute(attribute);
+    if (badAttribute) {
+      element.removeAttribute(attribute.name);
+      continue;
+    }
+    if (attribute.name.startsWith("@")) {
+    } else {
+      const isFunction = typeof value === "function";
+      getSetter(attribute.name, isFunction)?.(element, attribute.name, isFunction ? value() : attribute.value);
+    }
+  }
+}
+var setAny = function(element, name, value) {
+  if (isReactive(value)) {
+    return effect(() => setAnyAttribute(element, name, value.value));
+  }
+  setAnyAttribute(element, name, value);
+};
+var setAnyAttribute = function(element, name, value) {
+  if (value == null) {
+    element.removeAttribute(name);
+  } else {
+    element.setAttribute(name, String(value));
+  }
+};
+var setBoolean = function(element, name, value) {
+  if (isReactive(value)) {
+    return effect(() => setBooleanAttribute(element, name, value.value));
+  }
+  setBooleanAttribute(element, name, value);
+};
+var setBooleanAttribute = function(element, name, value) {
+  if (/^(|true)$/i.test(String(value))) {
+    element.setAttribute(name, "");
+  } else {
+    element.removeAttribute(name);
+  }
+};
+var setClasses = function(element, name, value) {
+  const classes = name.split(".").slice(1).filter((name2) => name2.length > 0);
+  if (classes.length === 0) {
+    return;
+  }
+  if (isReactive(value)) {
+    return effect(() => updateClassList(element, classes, value.value));
+  }
+  updateClassList(element, classes, value);
+};
+var setStyle = function(element, name, value) {
+  if (!isStylableElement(element)) {
+    return;
+  }
+  const [, first, second] = name.split(".");
+  const property = first.trim();
+  const suffix = second?.trim();
+  if (property.length === 0 || suffix != null && suffix.length === 0) {
+    return;
+  }
+  if (isReactive(value)) {
+    return effect(() => updateStyleProperty(element, property, suffix, value.value));
+  }
+  updateStyleProperty(element, property, suffix, value);
+};
+var updateClassList = function(element, classes, value) {
+  if (value === true) {
+    element.classList.add(...classes);
+  } else {
+    element.classList.remove(...classes);
+  }
+};
+var updateStyleProperty = function(element, property, suffix, value) {
+  if (value == null || value === false || value === true && suffix == null) {
+    element.style.removeProperty(property);
+  } else {
+    element.style.setProperty(property, value === true ? String(suffix) : `${value}${suffix ?? ""}`);
+  }
+};
+var booleanAttributes = new Set([
+  "checked",
+  "disabled",
+  "hidden",
+  "inert",
+  "multiple",
+  "open",
+  "readonly",
+  "required",
+  "selected"
+]);
+
 // src/bloom/node.ts
 function createNode(value) {
   if (value instanceof Node) {
@@ -159,12 +276,15 @@ function createNodes(html) {
   cloned.normalize();
   return cloned;
 }
-var getIndex = function(value) {
+var getIndex2 = function(value) {
   const [, index] = /^bloom\.(\d+)$/.exec(value) ?? [];
   return index == null ? -1 : +index;
 };
-function mapNodes(values, node2) {
-  const children = Array.from(node2.childNodes);
+function isStylableElement(element) {
+  return element instanceof HTMLElement || element instanceof SVGElement;
+}
+function mapNodes(values, node3) {
+  const children = Array.from(node3.childNodes);
   const { length } = children;
   let index = 0;
   for (;index < length; index += 1) {
@@ -174,12 +294,13 @@ function mapNodes(values, node2) {
       continue;
     }
     if (child instanceof Element) {
+      mapAttributes(values, child);
     }
     if (child.hasChildNodes()) {
       mapNodes(values, child);
     }
   }
-  return node2;
+  return node3;
 }
 var setFunction = function(comment, callback) {
   const value = callback();
@@ -190,8 +311,8 @@ var setFunction = function(comment, callback) {
   }
 };
 var setNode = function(comment, value) {
-  const node2 = createNode(value);
-  comment.replaceWith(.../^documentfragment$/i.test(node2.constructor.name) ? Array.from(node2.childNodes) : [node2]);
+  const node3 = createNode(value);
+  comment.replaceWith(.../^documentfragment$/i.test(node3.constructor.name) ? Array.from(node3.childNodes) : [node3]);
 };
 var setReactive = function(comment, reactive) {
   const text = document.createTextNode("");
@@ -206,8 +327,7 @@ var setReactive = function(comment, reactive) {
   });
 };
 var setValue = function(values, comment) {
-  const index = getIndex(comment.nodeValue ?? "");
-  const value = values[index];
+  const value = values[getIndex2(comment.nodeValue ?? "")];
   if (value == null) {
     return;
   }
@@ -219,6 +339,7 @@ var setValue = function(values, comment) {
 };
 export {
   mapNodes,
+  isStylableElement,
   createNodes,
   createNode
 };

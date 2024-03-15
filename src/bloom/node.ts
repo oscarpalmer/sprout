@@ -1,5 +1,6 @@
 import {type Reactive, isReactive, effect} from '@oscarpalmer/atoms/signal';
 import {isBloom} from '../bloom';
+import {mapAttributes} from './attribute';
 
 export function createNode(value: unknown): Node {
 	if (value instanceof Node) {
@@ -39,6 +40,12 @@ function getIndex(value: string): number {
 	return index == null ? -1 : +index;
 }
 
+export function isStylableElement(
+	element: Element,
+): element is HTMLElement | SVGElement {
+	return element instanceof HTMLElement || element instanceof SVGElement;
+}
+
 export function mapNodes(values: unknown[], node: Node): Node {
 	const children = Array.from(node.childNodes);
 	const {length} = children;
@@ -55,7 +62,7 @@ export function mapNodes(values: unknown[], node: Node): Node {
 		}
 
 		if (child instanceof Element) {
-			// TODO: attribute mapping
+			mapAttributes(values, child);
 		}
 
 		if (child.hasChildNodes()) {
@@ -104,8 +111,7 @@ function setReactive(comment: Comment, reactive: Reactive): void {
 }
 
 function setValue(values: unknown[], comment: Comment): void {
-	const index = getIndex(comment.nodeValue ?? '');
-	const value = values[index];
+	const value = values[getIndex(comment.nodeValue ?? '')];
 
 	if (value == null) {
 		return;

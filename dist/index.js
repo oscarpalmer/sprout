@@ -87,6 +87,123 @@ class Effect extends Atomic {
   }
 }
 
+// src/bloom/attribute.ts
+var getIndex = function(value) {
+  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value) ?? [];
+  return index == null ? -1 : +index;
+};
+var getSetter = function(name, allowAny) {
+  switch (true) {
+    case booleanAttributes.has(name.toLowerCase()):
+      return setBoolean;
+    case /^class\.\w/.test(name):
+      return setClasses;
+    case /^style\.\w/.test(name):
+      return setStyle;
+    default:
+      return allowAny ? setAny : undefined;
+  }
+};
+var isBadAttribute = function(attribute) {
+  const { name, value } = attribute;
+  return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value);
+};
+function mapAttributes(values, element) {
+  const attributes = Array.from(element.attributes);
+  const { length } = attributes;
+  let index = 0;
+  for (;index < length; index += 1) {
+    const attribute = attributes[index];
+    const value = values[getIndex(attribute.value)];
+    const badAttribute = isBadAttribute(attribute);
+    if (badAttribute) {
+      element.removeAttribute(attribute.name);
+      continue;
+    }
+    if (attribute.name.startsWith("@")) {
+    } else {
+      const isFunction = typeof value === "function";
+      getSetter(attribute.name, isFunction)?.(element, attribute.name, isFunction ? value() : attribute.value);
+    }
+  }
+}
+var setAny = function(element, name, value) {
+  if (isReactive(value)) {
+    return effect(() => setAnyAttribute(element, name, value.value));
+  }
+  setAnyAttribute(element, name, value);
+};
+var setAnyAttribute = function(element, name, value) {
+  if (value == null) {
+    element.removeAttribute(name);
+  } else {
+    element.setAttribute(name, String(value));
+  }
+};
+var setBoolean = function(element, name, value) {
+  if (isReactive(value)) {
+    return effect(() => setBooleanAttribute(element, name, value.value));
+  }
+  setBooleanAttribute(element, name, value);
+};
+var setBooleanAttribute = function(element, name, value) {
+  if (/^(|true)$/i.test(String(value))) {
+    element.setAttribute(name, "");
+  } else {
+    element.removeAttribute(name);
+  }
+};
+var setClasses = function(element, name, value) {
+  const classes = name.split(".").slice(1).filter((name2) => name2.length > 0);
+  if (classes.length === 0) {
+    return;
+  }
+  if (isReactive(value)) {
+    return effect(() => updateClassList(element, classes, value.value));
+  }
+  updateClassList(element, classes, value);
+};
+var setStyle = function(element, name, value) {
+  if (!isStylableElement(element)) {
+    return;
+  }
+  const [, first, second] = name.split(".");
+  const property = first.trim();
+  const suffix = second?.trim();
+  if (property.length === 0 || suffix != null && suffix.length === 0) {
+    return;
+  }
+  if (isReactive(value)) {
+    return effect(() => updateStyleProperty(element, property, suffix, value.value));
+  }
+  updateStyleProperty(element, property, suffix, value);
+};
+var updateClassList = function(element, classes, value) {
+  if (value === true) {
+    element.classList.add(...classes);
+  } else {
+    element.classList.remove(...classes);
+  }
+};
+var updateStyleProperty = function(element, property, suffix, value) {
+  if (value == null || value === false || value === true && suffix == null) {
+    element.style.removeProperty(property);
+  } else {
+    element.style.setProperty(property, value === true ? String(suffix) : `${value}${suffix ?? ""}`);
+  }
+};
+var booleanAttributes = new Set([
+  "checked",
+  "disabled",
+  "hidden",
+  "inert",
+  "multiple",
+  "open",
+  "readonly",
+  "required",
+  "selected"
+]);
+
 // src/bloom/node.ts
 function createNode(value) {
   if (value instanceof Node) {
@@ -108,12 +225,15 @@ function createNodes(html) {
   cloned.normalize();
   return cloned;
 }
-var getIndex = function(value) {
+var getIndex2 = function(value) {
   const [, index] = /^bloom\.(\d+)$/.exec(value) ?? [];
   return index == null ? -1 : +index;
 };
-function mapNodes(values, node) {
-  const children = Array.from(node.childNodes);
+function isStylableElement(element) {
+  return element instanceof HTMLElement || element instanceof SVGElement;
+}
+function mapNodes(values, node2) {
+  const children = Array.from(node2.childNodes);
   const { length } = children;
   let index = 0;
   for (;index < length; index += 1) {
@@ -123,12 +243,13 @@ function mapNodes(values, node) {
       continue;
     }
     if (child instanceof Element) {
+      mapAttributes(values, child);
     }
     if (child.hasChildNodes()) {
       mapNodes(values, child);
     }
   }
-  return node;
+  return node2;
 }
 var setFunction = function(comment, callback) {
   const value = callback();
@@ -139,8 +260,8 @@ var setFunction = function(comment, callback) {
   }
 };
 var setNode = function(comment, value) {
-  const node = createNode(value);
-  comment.replaceWith(.../^documentfragment$/i.test(node.constructor.name) ? Array.from(node.childNodes) : [node]);
+  const node2 = createNode(value);
+  comment.replaceWith(.../^documentfragment$/i.test(node2.constructor.name) ? Array.from(node2.childNodes) : [node2]);
 };
 var setReactive = function(comment, reactive) {
   const text = document.createTextNode("");
@@ -155,8 +276,7 @@ var setReactive = function(comment, reactive) {
   });
 };
 var setValue = function(values, comment) {
-  const index = getIndex(comment.nodeValue ?? "");
-  const value = values[index];
+  const value = values[getIndex2(comment.nodeValue ?? "")];
   if (value == null) {
     return;
   }
@@ -255,7 +375,7 @@ function petal(name, bud) {
   buds.set(name, bud);
 }
 var update = function(element, from) {
-  const attributes = getAttributes(from, element.getAttribute(attribute) ?? "");
+  const attributes = getAttributes(from, element.getAttribute(attribute2) ?? "");
   let elementControllers = petals.get(element);
   if (elementControllers === undefined) {
     elementControllers = new Set;
@@ -296,11 +416,11 @@ class Petal {
   disconnected() {
   }
 }
-var attribute = "data-petal";
+var attribute2 = "data-petal";
 var buds = new Map;
 var petals = new Map;
 var options = {
-  attributeFilter: [attribute],
+  attributeFilter: [attribute2],
   attributeOldValue: true,
   attributes: true,
   childList: true,
@@ -308,7 +428,7 @@ var options = {
 };
 new MutationObserver(observer).observe(document, options);
 document.addEventListener("DOMContentLoaded", () => {
-  const elements = document.querySelectorAll(`[${attribute}]`);
+  const elements = document.querySelectorAll(`[${attribute2}]`);
   const { length } = elements;
   let index = 0;
   for (;index < length; index += 1) {
