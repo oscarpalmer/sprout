@@ -1,4 +1,4 @@
-import {type Reactive, isReactive, effect} from '@oscarpalmer/atoms/signal';
+import {type Reactive, isReactive, effect} from '@oscarpalmer/sentinel';
 import {isBloom} from '../bloom';
 import {mapAttributes} from './attribute';
 import { storeNode } from './store';
@@ -98,7 +98,7 @@ function setReactive(comment: Comment, reactive: Reactive): void {
 	const text = document.createTextNode('');
 
 	const fx = effect(() => {
-		const {value} = reactive;
+		const value = reactive.get();
 
 		text.textContent = String(value);
 

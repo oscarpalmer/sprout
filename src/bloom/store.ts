@@ -1,4 +1,4 @@
-import type {Effect} from '@oscarpalmer/atoms/signal';
+import type {Effect} from '@oscarpalmer/sentinel';
 import type {EventData} from './event';
 
 type Parameters = {
@@ -71,7 +71,7 @@ function updateNode(type: 'disable' | 'enable', node: Node): void {
 		if (type === 'disable') {
 			effect.stop();
 		} else {
-			effect.run();
+			effect.start();
 		}
 	}
 

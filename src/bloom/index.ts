@@ -1,4 +1,4 @@
-import { createNodes, mapNodes } from "./node";
+import {createNodes, mapNodes} from './node';
 
 type Data = {
 	expressions: unknown[];
@@ -55,7 +55,11 @@ function getPart(data: Data, prefix: string, expression: unknown): string {
 		return prefix;
 	}
 
-	if (typeof expression === 'function' || expression instanceof Node || expression instanceof Bloom) {
+	if (
+		typeof expression === 'function' ||
+		expression instanceof Node ||
+		expression instanceof Bloom
+	) {
 		data.values.push(expression);
 
 		return `${prefix}<!--bloom.${data.values.length - 1}-->`;

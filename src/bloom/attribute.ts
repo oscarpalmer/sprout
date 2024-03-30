@@ -1,9 +1,4 @@
-import {
-	type Effect,
-	isReactive,
-	effect,
-	isEffect,
-} from '@oscarpalmer/atoms/signal';
+import {type Effect, isReactive, effect, isEffect} from '@oscarpalmer/sentinel';
 import {isStylableElement} from './node';
 import {addEvent} from './event';
 import {storeNode} from './store';
@@ -99,7 +94,7 @@ function setAny(
 	value: unknown,
 ): Effect | undefined {
 	if (isReactive(value)) {
-		return effect(() => setAnyAttribute(element, name, value.value));
+		return effect(() => setAnyAttribute(element, name, value.get()));
 	}
 
 	setAnyAttribute(element, name, value);
@@ -119,7 +114,7 @@ function setBoolean(
 	value: unknown,
 ): Effect | undefined {
 	if (isReactive(value)) {
-		return effect(() => setBooleanAttribute(element, name, value.value));
+		return effect(() => setBooleanAttribute(element, name, value.get()));
 	}
 
 	setBooleanAttribute(element, name, value);
@@ -152,7 +147,7 @@ function setClasses(
 	}
 
 	if (isReactive(value)) {
-		return effect(() => updateClassList(element, classes, value.value));
+		return effect(() => updateClassList(element, classes, value.get()));
 	}
 
 	updateClassList(element, classes, value);
@@ -178,7 +173,7 @@ function setStyle(
 
 	if (isReactive(value)) {
 		return effect(() =>
-			updateStyleProperty(element, property, suffix, value.value),
+			updateStyleProperty(element, property, suffix, value.get()),
 		);
 	}
 

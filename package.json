@@ -4,7 +4,8 @@
 		"url": "https://oscarpalmer.se"
 	},
 	"dependencies": {
-		"@oscarpalmer/atoms": "^0.30"
+		"@oscarpalmer/atoms": "^0.32",
+		"@oscarpalmer/sentinel": "^0.14"
 	},
 	"description": "… sprouting like a cute little weird flower",
 	"devDependencies": {
@@ -53,5 +54,5 @@
 	},
 	"type": "module",
 	"types": "./types/index.d.ts",
-	"version": "0.6.0"
+	"version": "0.7.0"
 }

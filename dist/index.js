@@ -1,5 +1,5 @@
 // node_modules/@oscarpalmer/atoms/dist/js/queue.mjs
-if (globalThis._atomic_effects === undefined) {
+if (globalThis._atomic_queued === undefined) {
   const queued = new Set;
   Object.defineProperty(globalThis, "_atomic_queued", {
     get() {
@@ -8,97 +8,92 @@ if (globalThis._atomic_effects === undefined) {
   });
 }
 
-// node_modules/@oscarpalmer/atoms/dist/js/signal.mjs
-var effect = function(callback) {
-  return new Effect(callback);
-};
-var isComputed = function(value) {
-  return isInstance(/^computed$/i, value);
-};
-var isEffect = function(value) {
-  return isInstance(/^effect$/i, value);
-};
-var isReactive = function(value) {
-  return isComputed(value) || isSignal(value);
-};
-var isSignal = function(value) {
-  return isInstance(/^signal$/i, value);
-};
-var isInstance = function(expression, value) {
-  return expression.test(value?.constructor?.name ?? "") && value.atomic === true;
-};
-if (globalThis._atomic_effects === undefined) {
+// node_modules/@oscarpalmer/sentinel/dist/global.mjs
+if (globalThis._sentinels === undefined) {
   const effects = [];
-  Object.defineProperty(globalThis, "_atomic_effects", {
+  Object.defineProperty(globalThis, "_sentinels", {
     get() {
       return effects;
     }
   });
 }
 
-class Atomic {
-  constructor() {
-    Object.defineProperty(this, "atomic", {
-      value: true
-    });
+// node_modules/@oscarpalmer/sentinel/dist/models.mjs
+class Sentinel {
+  get active() {
+    return this.state.active;
+  }
+  constructor(active) {
+    this.state = { active };
   }
 }
 
-class Reactive extends Atomic {
-  constructor() {
-    super(...arguments);
+// node_modules/@oscarpalmer/sentinel/dist/effect.mjs
+var effect = function(callback) {
+  return new Effect(callback);
+};
+
+class Effect extends Sentinel {
+  constructor(callback) {
+    super(false);
+    this.state.callback = callback;
+    this.state.values = new Set;
+    this.start();
   }
-  _active = true;
-  _effects = new Set;
-  peek() {
-    return this._value;
-  }
-  toJSON() {
-    return this.value;
-  }
-  toString() {
-    return String(this.value);
-  }
-}
-class Effect extends Atomic {
-  _callback;
-  _active = false;
-  _reactives = new Set;
-  constructor(_callback) {
-    super();
-    this._callback = _callback;
-    this.run();
-  }
-  run() {
-    if (this._active) {
+  start() {
+    if (this.active) {
       return;
     }
-    this._active = true;
-    const index = _atomic_effects.push(this) - 1;
-    this._callback();
-    _atomic_effects.splice(index, 1);
+    this.state.active = true;
+    const index = globalThis._sentinels.push(this) - 1;
+    this.state.callback();
+    globalThis._sentinels.splice(index, 1);
   }
   stop() {
-    if (!this._active) {
+    if (!this.active) {
       return;
     }
-    this._active = false;
-    for (const value of this._reactives) {
-      value._effects.delete(this);
+    this.state.active = false;
+    for (const value of this.state.values) {
+      value.state.effects.delete(this);
     }
-    this._reactives.clear();
+    this.state.values.clear();
   }
 }
+
+// node_modules/@oscarpalmer/sentinel/dist/helpers/is.mjs
+var isEffect = function(value) {
+  return isInstance(value, /^effect$/i);
+};
+var isReactive = function(value) {
+  return isInstance(value, /^computed|list|signal|store$/i);
+};
+var isInstance = function(value, expression) {
+  return expression.test(value?.constructor?.name ?? "");
+};
+
+// node_modules/@oscarpalmer/sentinel/dist/helpers/value.mjs
+var operations = new Set([
+  "copyWithin",
+  "fill",
+  "pop",
+  "push",
+  "reverse",
+  "shift",
+  "sort",
+  "splice",
+  "unshift"
+]);
 
 // src/bloom/store.ts
 function storeNode(node, data) {
-  let stored = store.get(node);
+  let stored = store4.get(node);
   if (stored == null) {
     stored = {
       effects: new Set,
       events: new Map
     };
-    store.set(node, stored);
+    store4.set(node, stored);
   }
   if (data.effect != null) {
     stored.effects.add(data.effect);
@@ -114,18 +109,18 @@ function storeNode(node, data) {
     }
   }
 }
-var store = new WeakMap;
+var store4 = new WeakMap;
 
 // src/bloom/event.ts
-function addEvent(element, attribute, value) {
+function addEvent(element, attribute, value10) {
   element.removeAttribute(attribute);
-  if (typeof value !== "function") {
+  if (typeof value10 !== "function") {
     return;
   }
   const parameters = getParameters(attribute);
-  element.addEventListener(parameters.name, value, parameters.options);
+  element.addEventListener(parameters.name, value10, parameters.options);
   storeNode(element, {
-    event: { element, listener: value, ...parameters }
+    event: { element, listener: value10, ...parameters }
   });
 }
 var getParameters = function(attribute) {
@@ -140,8 +135,8 @@ var getParameters = function(attribute) {
 };
 
 // src/bloom/attribute.ts
-var getIndex = function(value) {
-  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value) ?? [];
+var getIndex = function(value10) {
+  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value10) ?? [];
   return index == null ? -1 : +index;
 };
 var getSetter = function(name, allowAny) {
@@ -157,8 +152,8 @@ var getSetter = function(name, allowAny) {
   }
 };
 var isBadAttribute = function(attribute) {
-  const { name, value } = attribute;
-  return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value);
+  const { name, value: value10 } = attribute;
+  return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value10);
 };
 function mapAttributes(values, element) {
   const attributes = Array.from(element.attributes);
@@ -166,60 +161,60 @@ function mapAttributes(values, element) {
   let index = 0;
   for (;index < length; index += 1) {
     const attribute = attributes[index];
-    const value = values[getIndex(attribute.value)];
+    const value10 = values[getIndex(attribute.value)];
     const badAttribute = isBadAttribute(attribute);
     if (badAttribute) {
       element.removeAttribute(attribute.name);
       continue;
     }
     if (attribute.name.startsWith("@")) {
-      addEvent(element, attribute.name, value);
+      addEvent(element, attribute.name, value10);
     } else {
-      const isFunction = typeof value === "function";
-      const fx = getSetter(attribute.name, isFunction)?.(element, attribute.name, isFunction ? value() : attribute.value);
+      const isFunction = typeof value10 === "function";
+      const fx = getSetter(attribute.name, isFunction)?.(element, attribute.name, isFunction ? value10() : attribute.value);
       if (isEffect(fx)) {
         storeNode(element, { effect: fx });
       }
     }
   }
 }
-var setAny = function(element, name, value) {
-  if (isReactive(value)) {
-    return effect(() => setAnyAttribute(element, name, value.value));
+var setAny = function(element, name, value10) {
+  if (isReactive(value10)) {
+    return effect(() => setAnyAttribute(element, name, value10.get()));
   }
-  setAnyAttribute(element, name, value);
+  setAnyAttribute(element, name, value10);
 };
-var setAnyAttribute = function(element, name, value) {
-  if (value == null) {
+var setAnyAttribute = function(element, name, value10) {
+  if (value10 == null) {
     element.removeAttribute(name);
   } else {
-    element.setAttribute(name, String(value));
+    element.setAttribute(name, String(value10));
   }
 };
-var setBoolean = function(element, name, value) {
-  if (isReactive(value)) {
-    return effect(() => setBooleanAttribute(element, name, value.value));
+var setBoolean = function(element, name, value10) {
+  if (isReactive(value10)) {
+    return effect(() => setBooleanAttribute(element, name, value10.get()));
   }
-  setBooleanAttribute(element, name, value);
+  setBooleanAttribute(element, name, value10);
 };
-var setBooleanAttribute = function(element, name, value) {
-  if (/^(|true)$/i.test(String(value))) {
+var setBooleanAttribute = function(element, name, value10) {
+  if (/^(|true)$/i.test(String(value10))) {
     element.setAttribute(name, "");
   } else {
     element.removeAttribute(name);
   }
 };
-var setClasses = function(element, name, value) {
+var setClasses = function(element, name, value10) {
   const classes = name.split(".").slice(1).filter((name2) => name2.length > 0);
   if (classes.length === 0) {
     return;
   }
-  if (isReactive(value)) {
-    return effect(() => updateClassList(element, classes, value.value));
+  if (isReactive(value10)) {
+    return effect(() => updateClassList(element, classes, value10.get()));
   }
-  updateClassList(element, classes, value);
+  updateClassList(element, classes, value10);
 };
-var setStyle = function(element, name, value) {
+var setStyle = function(element, name, value10) {
   if (!isStylableElement(element)) {
     return;
   }
@@ -229,23 +224,23 @@ var setStyle = function(element, name, value) {
   if (property.length === 0 || suffix != null && suffix.length === 0) {
     return;
   }
-  if (isReactive(value)) {
-    return effect(() => updateStyleProperty(element, property, suffix, value.value));
+  if (isReactive(value10)) {
+    return effect(() => updateStyleProperty(element, property, suffix, value10.get()));
   }
-  updateStyleProperty(element, property, suffix, value);
+  updateStyleProperty(element, property, suffix, value10);
 };
-var updateClassList = function(element, classes, value) {
-  if (value === true) {
+var updateClassList = function(element, classes, value10) {
+  if (value10 === true) {
     element.classList.add(...classes);
   } else {
     element.classList.remove(...classes);
   }
 };
-var updateStyleProperty = function(element, property, suffix, value) {
-  if (value == null || value === false || value === true && suffix == null) {
+var updateStyleProperty = function(element, property, suffix, value10) {
+  if (value10 == null || value10 === false || value10 === true && suffix == null) {
     element.style.removeProperty(property);
   } else {
-    element.style.setProperty(property, value === true ? String(suffix) : `${value}${suffix ?? ""}`);
+    element.style.setProperty(property, value10 === true ? String(suffix) : `${value10}${suffix ?? ""}`);
   }
 };
 var booleanAttributes = new Set([
@@ -261,14 +256,14 @@ var booleanAttributes = new Set([
 ]);
 
 // src/bloom/node.ts
-function createNode(value) {
-  if (value instanceof Node) {
-    return value;
+function createNode(value10) {
+  if (value10 instanceof Node) {
+    return value10;
   }
-  if (isBloom(value)) {
-    return value.grow();
+  if (isBloom(value10)) {
+    return value10.grow();
   }
-  return document.createTextNode(String(value));
+  return document.createTextNode(String(value10));
 }
 function createNodes(html) {
   const template = document.createElement("template");
@@ -281,8 +276,8 @@ function createNodes(html) {
   cloned.normalize();
   return cloned;
 }
-var getIndex2 = function(value) {
-  const [, index] = /^bloom\.(\d+)$/.exec(value) ?? [];
+var getIndex2 = function(value10) {
+  const [, index] = /^bloom\.(\d+)$/.exec(value10) ?? [];
   return index == null ? -1 : +index;
 };
 function isStylableElement(element) {
@@ -295,7 +290,7 @@ function mapNodes(values, node2) {
   for (;index < length; index += 1) {
     const child = children[index];
     if (child.nodeType === 8) {
-      setValue(values, child);
+      setValue2(values, child);
       continue;
     }
     if (child instanceof Element) {
@@ -308,40 +303,40 @@ function mapNodes(values, node2) {
   return node2;
 }
 var setFunction = function(comment, callback) {
-  const value = callback();
-  if (isReactive(value)) {
-    setReactive(comment, value);
+  const value10 = callback();
+  if (isReactive(value10)) {
+    setReactive(comment, value10);
   } else {
-    setNode(comment, value);
+    setNode(comment, value10);
   }
 };
-var setNode = function(comment, value) {
-  const node2 = createNode(value);
+var setNode = function(comment, value10) {
+  const node2 = createNode(value10);
   comment.replaceWith(.../^documentfragment$/i.test(node2.constructor.name) ? Array.from(node2.childNodes) : [node2]);
 };
-var setReactive = function(comment, reactive) {
+var setReactive = function(comment, reactive3) {
   const text = document.createTextNode("");
   const fx = effect(() => {
-    const { value } = reactive;
-    text.textContent = String(value);
-    if (value == null && text.parentNode != null) {
+    const value10 = reactive3.get();
+    text.textContent = String(value10);
+    if (value10 == null && text.parentNode != null) {
       text.replaceWith(comment);
-    } else if (value != null && text.parentNode == null) {
+    } else if (value10 != null && text.parentNode == null) {
       comment.replaceWith(text);
     }
   });
   storeNode(comment, { effect: fx });
   storeNode(text, { effect: fx });
 };
-var setValue = function(values, comment) {
-  const value = values[getIndex2(comment.nodeValue ?? "")];
-  if (value == null) {
+var setValue2 = function(values, comment) {
+  const value10 = values[getIndex2(comment.nodeValue ?? "")];
+  if (value10 == null) {
     return;
   }
-  if (typeof value === "function") {
-    setFunction(comment, value);
+  if (typeof value10 === "function") {
+    setFunction(comment, value10);
   } else {
-    setNode(comment, value);
+    setNode(comment, value10);
   }
 };
 
@@ -379,8 +374,8 @@ var getPart = function(data, prefix, expression) {
   }
   return `${prefix}${expression}`;
 };
-function isBloom(value) {
-  return value instanceof Bloom;
+function isBloom(value10) {
+  return value10 instanceof Bloom;
 }
 
 class Bloom {
@@ -408,9 +403,9 @@ var getAttributes = function(from, to) {
     const other = outer === 1 ? fromValues : toValues;
     const { length } = values;
     for (let inner = 0;inner < length; inner += 1) {
-      const value = values[inner];
-      if (!other.includes(value)) {
-        result[outer].push(value);
+      const value10 = values[inner];
+      if (!other.includes(value10)) {
+        result[outer].push(value10);
       }
     }
   }
@@ -444,7 +439,7 @@ var update = function(element, from) {
   for (;index < length; index += 1) {
     const name = attributes[0][index];
     const bud = buds.get(name);
-    const existing = Array.from(elementControllers).find((value) => value.constructor === bud);
+    const existing = Array.from(elementControllers).find((value10) => value10.constructor === bud);
     if (existing !== undefined) {
       existing.disconnected();
       elementControllers.delete(existing);
@@ -455,7 +450,7 @@ var update = function(element, from) {
   for (;index < length; index += 1) {
     const name = attributes[1][index];
     const bud = buds.get(name);
-    const none = Array.from(elementControllers).findIndex((value) => value.constructor === bud) === -1;
+    const none = Array.from(elementControllers).findIndex((value10) => value10.constructor === bud) === -1;
     if (bud !== undefined && none) {
       const petal2 = new bud(element);
       petal2.connected();

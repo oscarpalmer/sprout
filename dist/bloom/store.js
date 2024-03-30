@@ -42,7 +42,7 @@ var updateNode = function(type, node) {
     if (type === "disable") {
       effect.stop();
     } else {
-      effect.run();
+      effect.start();
     }
   }
   const callback = type === "disable" ? node.removeEventListener : node.addEventListener;
