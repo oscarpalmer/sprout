@@ -5,12 +5,12 @@
 	},
 	"dependencies": {
 		"@oscarpalmer/atoms": "^0.32",
-		"@oscarpalmer/sentinel": "^0.14"
+		"@oscarpalmer/sentinel": "^0.18"
 	},
 	"description": "… sprouting like a cute little weird flower",
 	"devDependencies": {
 		"@biomejs/biome": "^1.6",
-		"bun": "^1.0",
+		"bun": "^1.1",
 		"typescript": "^5.4"
 	},
 	"exports": {
@@ -54,5 +54,5 @@
 	},
 	"type": "module",
 	"types": "./types/index.d.ts",
-	"version": "0.7.0"
+	"version": "0.8.0"
 }

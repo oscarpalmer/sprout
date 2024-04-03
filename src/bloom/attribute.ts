@@ -1,6 +1,6 @@
-import {type Effect, isReactive, effect, isEffect} from '@oscarpalmer/sentinel';
-import {isStylableElement} from './node';
+import {type Effect, effect, isEffect, isReactive} from '@oscarpalmer/sentinel';
 import {addEvent} from './event';
+import {isStylableElement} from './node';
 import {storeNode} from './store';
 
 const booleanAttributes = new Set([

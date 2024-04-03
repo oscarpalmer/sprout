@@ -7,31 +7,35 @@ type Data = {
 	values: unknown[];
 };
 
-class Bloom {
-	private declare readonly data: Data;
-
-	constructor(strings: TemplateStringsArray, ...expressions: unknown[]) {
-		this.data = {
-			expressions,
-			strings,
-			html: '',
-			values: [],
-		};
-	}
-
-	grow(): Node {
-		const html = getHtml(this.data);
-		const nodes = createNodes(html);
-
-		return mapNodes(this.data.values, nodes);
-	}
-}
+type Bloom = {
+	grow(): Node;
+};
 
 export function bloom(
 	strings: TemplateStringsArray,
 	...expressions: unknown[]
 ): Bloom {
-	return new Bloom(strings, ...expressions);
+	const data: Data = {
+		expressions,
+		strings,
+		html: '',
+		values: [],
+	};
+
+	const instance = Object.create({
+		grow(): Node {
+			const html = getHtml(data);
+			const nodes = createNodes(html);
+
+			return mapNodes(data.values, nodes);
+		},
+	});
+
+	Object.defineProperty(instance, '$bloom', {
+		value: true,
+	});
+
+	return instance;
 }
 
 function getHtml(data: Data): string {
@@ -58,7 +62,7 @@ function getPart(data: Data, prefix: string, expression: unknown): string {
 	if (
 		typeof expression === 'function' ||
 		expression instanceof Node ||
-		expression instanceof Bloom
+		isBloom(expression)
 	) {
 		data.values.push(expression);
 
@@ -82,5 +86,5 @@ function getPart(data: Data, prefix: string, expression: unknown): string {
 }
 
 export function isBloom(value: unknown): value is Bloom {
-	return value instanceof Bloom;
+	return (value as any)?.$sentinel === true;
 }

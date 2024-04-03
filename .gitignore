@@ -1,6 +1,8 @@
 node_modules/
 www/
 
+dist/**/*.js
 dist/**/*.mjs
+!dist/**/index.js
 
 *.tsbuildinfo
