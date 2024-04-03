@@ -1,3 +1,47 @@
+// src/bloom/is.ts
+function isBadAttribute(attribute) {
+  const { name, value } = attribute;
+  return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value);
+}
+function isBloom(value) {
+  return value?.$sentinel === true;
+}
+function isStylableElement(element) {
+  return element instanceof HTMLElement || element instanceof SVGElement;
+}
+
+// src/bloom/html.ts
+function getHtml(data) {
+  if (data.html.length > 0) {
+    return data.html;
+  }
+  const { length } = data.strings;
+  let index = 0;
+  for (;index < length; index += 1) {
+    data.html += getPartial(data, data.strings[index], data.expressions[index]);
+  }
+  return data.html;
+}
+var getPartial = function(data, prefix, expression) {
+  if (expression == null) {
+    return prefix;
+  }
+  if (typeof expression === "function" || expression instanceof Node || isBloom(expression)) {
+    data.values.push(expression);
+    return `${prefix}<!--bloom.${data.values.length - 1}-->`;
+  }
+  if (Array.isArray(expression)) {
+    const { length } = expression;
+    let html = "";
+    let index = 0;
+    for (;index < length; index += 1) {
+      html += getPartial(data, "", expression[index]);
+    }
+    return `${prefix}${html}`;
+  }
+  return `${prefix}${expression}`;
+};
+
 // node_modules/@oscarpalmer/atoms/dist/js/queue.mjs
 if (globalThis._atomic_queued === undefined) {
   const queued = new Set;
@@ -144,10 +188,6 @@ var getSetter = function(name, allowAny) {
       return allowAny ? setAny : undefined;
   }
 };
-var isBadAttribute = function(attribute) {
-  const { name, value: value9 } = attribute;
-  return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value9);
-};
 function mapAttributes(values, element) {
   const attributes = Array.from(element.attributes);
   const { length } = attributes;
@@ -273,11 +313,8 @@ var getIndex2 = function(value9) {
   const [, index] = /^bloom\.(\d+)$/.exec(value9) ?? [];
   return index == null ? -1 : +index;
 };
-function isStylableElement(element) {
-  return element instanceof HTMLElement || element instanceof SVGElement;
-}
-function mapNodes(values, node2) {
-  const children = Array.from(node2.childNodes);
+function mapNodes(values, node) {
+  const children = Array.from(node.childNodes);
   const { length } = children;
   let index = 0;
   for (;index < length; index += 1) {
@@ -293,7 +330,7 @@ function mapNodes(values, node2) {
       mapNodes(values, child);
     }
   }
-  return node2;
+  return node;
 }
 var setFunction = function(comment, callback) {
   const value9 = callback();
@@ -304,8 +341,8 @@ var setFunction = function(comment, callback) {
   }
 };
 var setNode = function(comment, value9) {
-  const node2 = createNode(value9);
-  comment.replaceWith(.../^documentfragment$/i.test(node2.constructor.name) ? Array.from(node2.childNodes) : [node2]);
+  const node = createNode(value9);
+  comment.replaceWith(.../^documentfragment$/i.test(node.constructor.name) ? Array.from(node.childNodes) : [node]);
 };
 var setReactive = function(comment, reactive3) {
   const text = document.createTextNode("");
@@ -334,7 +371,7 @@ var setValue2 = function(values, comment) {
 };
 
 // src/bloom/index.ts
-function bloom2(strings, ...expressions) {
+function bloom(strings, ...expressions) {
   const data = {
     expressions,
     strings,
@@ -343,8 +380,8 @@ function bloom2(strings, ...expressions) {
   };
   const instance = Object.create({
     grow() {
-      const html = getHtml(data);
-      const nodes = createNodes(html);
+      const html2 = getHtml(data);
+      const nodes = createNodes(html2);
       return mapNodes(data.values, nodes);
     }
   });
@@ -352,39 +389,6 @@ function bloom2(strings, ...expressions) {
     value: true
   });
   return instance;
-}
-var getHtml = function(data) {
-  if (data.html.length > 0) {
-    return data.html;
-  }
-  const { length } = data.strings;
-  let index = 0;
-  for (;index < length; index += 1) {
-    data.html += getPart(data, data.strings[index], data.expressions[index]);
-  }
-  return data.html;
-};
-var getPart = function(data, prefix, expression) {
-  if (expression == null) {
-    return prefix;
-  }
-  if (typeof expression === "function" || expression instanceof Node || isBloom(expression)) {
-    data.values.push(expression);
-    return `${prefix}<!--bloom.${data.values.length - 1}-->`;
-  }
-  if (Array.isArray(expression)) {
-    const { length } = expression;
-    let html = "";
-    let index = 0;
-    for (;index < length; index += 1) {
-      html += getPart(data, "", expression[index]);
-    }
-    return `${prefix}${html}`;
-  }
-  return `${prefix}${expression}`;
-};
-function isBloom(value9) {
-  return value9?.$sentinel === true;
 }
 // src/petal/index.ts
 var getAttributes = function(from, to) {
@@ -483,7 +487,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 export {
   petal,
-  isBloom,
-  bloom2 as bloom,
+  bloom,
   Petal
 };

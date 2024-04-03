@@ -1,6 +1,6 @@
 import {type Effect, effect, isEffect, isReactive} from '@oscarpalmer/sentinel';
 import {addEvent} from './event';
-import {isStylableElement} from './node';
+import {isBadAttribute, isStylableElement} from './is';
 import {storeNode} from './store';
 
 const booleanAttributes = new Set([
@@ -40,16 +40,6 @@ function getSetter(
 		default:
 			return allowAny ? setAny : undefined;
 	}
-}
-
-function isBadAttribute(attribute: Attr): boolean {
-	const {name, value} = attribute;
-
-	return (
-		/^on/i.test(name) ||
-		(/^(href|src|xlink:href)$/i.test(name) &&
-			/(data:text\/html|javascript:)/i.test(value))
-	);
 }
 
 export function mapAttributes(values: unknown[], element: Element): void {

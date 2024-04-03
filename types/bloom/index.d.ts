@@ -1,6 +1,3 @@
-type Bloom = {
-    grow(): Node;
-};
+import type { Bloom } from './models';
 export declare function bloom(strings: TemplateStringsArray, ...expressions: unknown[]): Bloom;
-export declare function isBloom(value: unknown): value is Bloom;
-export {};
+export type { Bloom };

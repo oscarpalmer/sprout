@@ -1,14 +1,5 @@
+import type {EventParameters} from './models';
 import {storeNode} from './store';
-
-export type EventData = {
-	element: Element;
-	listener: EventListener;
-} & Parameters;
-
-type Parameters = {
-	name: string;
-	options: AddEventListenerOptions;
-};
 
 export function addEvent(
 	element: Element,
@@ -30,7 +21,7 @@ export function addEvent(
 	});
 }
 
-function getParameters(attribute: string): Parameters {
+function getParameters(attribute: string): EventParameters {
 	const parts = attribute.slice(1).toLowerCase().split(':');
 
 	const name = parts.shift() as string;

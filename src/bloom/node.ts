@@ -1,6 +1,6 @@
 import {type Reactive, effect, isReactive} from '@oscarpalmer/sentinel';
-import {isBloom} from '../bloom';
 import {mapAttributes} from './attribute';
+import {isBloom} from './is';
 import {storeNode} from './store';
 
 export function createNode(value: unknown): Node {
@@ -39,12 +39,6 @@ function getIndex(value: string): number {
 	const [, index] = /^bloom\.(\d+)$/.exec(value) ?? [];
 
 	return index == null ? -1 : +index;
-}
-
-export function isStylableElement(
-	element: Element,
-): element is HTMLElement | SVGElement {
-	return element instanceof HTMLElement || element instanceof SVGElement;
 }
 
 export function mapNodes(values: unknown[], node: Node): Node {

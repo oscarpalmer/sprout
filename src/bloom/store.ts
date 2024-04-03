@@ -1,17 +1,6 @@
-import type {Effect} from '@oscarpalmer/sentinel';
-import type {EventData} from './event';
+import type {StoredData, StoredParameters} from './models';
 
-type Parameters = {
-	effect: Effect;
-	event: EventData;
-};
-
-type Stored = {
-	effects: Set<Effect>;
-	events: Map<string, Map<EventListener, EventData>>;
-};
-
-const store = new WeakMap<Node, Stored>();
+const store = new WeakMap<Node, StoredData>();
 
 export function disableNode(node: Node): void {
 	updateNode('disable', node);
@@ -27,7 +16,7 @@ export function removeNode(node: Node): void {
 	node.parentNode?.removeChild(node);
 }
 
-export function storeNode(node: Node, data: Partial<Parameters>): void {
+export function storeNode(node: Node, data: Partial<StoredParameters>): void {
 	let stored = store.get(node);
 
 	if (stored == null) {
