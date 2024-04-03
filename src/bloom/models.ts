@@ -1,4 +1,4 @@
-import type { Effect } from "@oscarpalmer/sentinel";
+import type {Effect} from '@oscarpalmer/sentinel';
 
 export type BloomData = {
 	expressions: unknown[];

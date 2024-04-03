@@ -3,6 +3,9 @@ www/
 
 dist/**/*.js
 dist/**/*.mjs
-!dist/**/index.js
+
+!dist/index.js
+!dist/bloom/index.js
+!dist/petal/index.js
 
 *.tsbuildinfo

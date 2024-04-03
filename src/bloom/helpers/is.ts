@@ -1,4 +1,4 @@
-import type {Bloom} from './models';
+import type {Bloom} from '../models';
 
 export function isBadAttribute(attribute: Attr): boolean {
 	const {name, value} = attribute;

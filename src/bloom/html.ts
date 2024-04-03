@@ -1,4 +1,4 @@
-import {isBloom} from './is';
+import {isBloom} from './helpers/is';
 import type {BloomData} from './models';
 
 export function getHtml(data: BloomData): string {

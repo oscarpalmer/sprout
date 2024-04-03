@@ -1,6 +1,6 @@
-import {type Reactive, effect, isReactive} from '@oscarpalmer/sentinel';
-import {mapAttributes} from './attribute';
-import {isBloom} from './is';
+import {effect, isReactive, type Reactive} from '@oscarpalmer/sentinel';
+import {mapAttributes} from './attribute/index';
+import {isBloom} from './helpers/is';
 import {storeNode} from './store';
 
 export function createNode(value: unknown): Node {

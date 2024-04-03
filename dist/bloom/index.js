@@ -1,3 +1,47 @@
+// src/bloom/helpers/is.ts
+function isBadAttribute(attribute) {
+  const { name, value } = attribute;
+  return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value);
+}
+function isBloom(value) {
+  return value?.$sentinel === true;
+}
+function isStylableElement(element) {
+  return element instanceof HTMLElement || element instanceof SVGElement;
+}
+
+// src/bloom/html.ts
+function getHtml(data) {
+  if (data.html.length > 0) {
+    return data.html;
+  }
+  const { length } = data.strings;
+  let index = 0;
+  for (;index < length; index += 1) {
+    data.html += getPartial(data, data.strings[index], data.expressions[index]);
+  }
+  return data.html;
+}
+var getPartial = function(data, prefix, expression) {
+  if (expression == null) {
+    return prefix;
+  }
+  if (typeof expression === "function" || expression instanceof Node || isBloom(expression)) {
+    data.values.push(expression);
+    return `${prefix}<!--bloom.${data.values.length - 1}-->`;
+  }
+  if (Array.isArray(expression)) {
+    const { length } = expression;
+    let html = "";
+    let index = 0;
+    for (;index < length; index += 1) {
+      html += getPartial(data, "", expression[index]);
+    }
+    return `${prefix}${html}`;
+  }
+  return `${prefix}${expression}`;
+};
+
 // node_modules/@oscarpalmer/atoms/dist/js/queue.mjs
 if (globalThis._atomic_queued === undefined) {
   const queued = new Set;
@@ -104,7 +148,7 @@ function storeNode(node, data) {
 }
 var store = new WeakMap;
 
-// src/bloom/event.ts
+// src/bloom/helpers/event.ts
 function addEvent(element, attribute, value9) {
   element.removeAttribute(attribute);
   if (typeof value9 !== "function") {
@@ -127,26 +171,102 @@ var getParameters = function(attribute) {
   return { name, options };
 };
 
-// src/bloom/attribute.ts
-var getIndex = function(value9) {
-  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value9) ?? [];
-  return index == null ? -1 : +index;
+// src/bloom/attribute/any.ts
+function setAny(element, name, value9) {
+  const isBoolean = booleanAttributes.has(name) && name in element;
+  const isValue = name === "value" && name in element;
+  const callback = isBoolean ? setBooleanAttribute : setAnyAttribute;
+  if (isReactive(value9)) {
+    return effect(() => callback(element, name, value9.get(), isValue));
+  }
+  callback(element, name, value9, isValue);
+}
+var setAnyAttribute = function(element, name, value9, isValue) {
+  if (isValue) {
+    element.value = String(value9);
+    return;
+  }
+  if (value9 == null) {
+    element.removeAttribute(name);
+  } else {
+    element.setAttribute(name, String(value9));
+  }
 };
-var getSetter = function(name, allowAny) {
+var setBooleanAttribute = function(element, name, value9) {
+  element[name] = /^(|true)$/i.test(String(value9));
+};
+var booleanAttributes = new Set([
+  "checked",
+  "disabled",
+  "hidden",
+  "inert",
+  "multiple",
+  "open",
+  "readonly",
+  "required",
+  "selected"
+]);
+
+// src/bloom/attribute/classes.ts
+function setClasses(element, name, value9) {
+  const classes = name.split(".").slice(1).filter((name2) => name2.length > 0);
+  if (classes.length === 0) {
+    return;
+  }
+  if (isReactive(value9)) {
+    return effect(() => updateClassList(element, classes, value9.get()));
+  }
+  updateClassList(element, classes, value9);
+}
+var updateClassList = function(element, classes, value9) {
+  if (value9 === true) {
+    element.classList.add(...classes);
+  } else {
+    element.classList.remove(...classes);
+  }
+};
+
+// src/bloom/attribute/style.ts
+function setStyle(element, name, value9) {
+  if (!isStylableElement(element)) {
+    return;
+  }
+  const [, first, second] = name.split(".");
+  const property = first.trim();
+  const suffix = second?.trim();
+  if (property.length === 0 || suffix != null && suffix.length === 0) {
+    return;
+  }
+  if (isReactive(value9)) {
+    return effect(() => updateStyleProperty(element, property, suffix, value9.get()));
+  }
+  updateStyleProperty(element, property, suffix, value9);
+}
+var updateStyleProperty = function(element, property, suffix, value9) {
+  if (value9 == null || value9 === false || value9 === true && suffix == null) {
+    element.style.removeProperty(property);
+  } else {
+    element.style.setProperty(property, value9 === true ? String(suffix) : `${value9}${suffix ?? ""}`);
+  }
+};
+
+// src/bloom/attribute/index.ts
+var getAttributeEffect = function(name, allowAny) {
   switch (true) {
-    case booleanAttributes.has(name.toLowerCase()):
-      return setBoolean;
     case /^class\.\w/.test(name):
       return setClasses;
     case /^style\.\w/.test(name):
       return setStyle;
+    case allowAny:
+    case booleanAttributes.has(name):
+      return setAny;
     default:
-      return allowAny ? setAny : undefined;
+      break;
   }
 };
-var isBadAttribute = function(attribute) {
-  const { name, value: value9 } = attribute;
-  return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value9);
+var getIndex = function(value9) {
+  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value9) ?? [];
+  return index == null ? -1 : +index;
 };
 function mapAttributes(values, element) {
   const attributes = Array.from(element.attributes);
@@ -164,89 +284,13 @@ function mapAttributes(values, element) {
       addEvent(element, attribute.name, value9);
     } else {
       const isFunction = typeof value9 === "function";
-      const fx = getSetter(attribute.name, isFunction)?.(element, attribute.name, isFunction ? value9() : attribute.value);
+      const fx = getAttributeEffect(attribute.name, isFunction)?.(element, attribute.name, isFunction ? value9() : attribute.value);
       if (isEffect(fx)) {
         storeNode(element, { effect: fx });
       }
     }
   }
 }
-var setAny = function(element, name, value9) {
-  if (isReactive(value9)) {
-    return effect(() => setAnyAttribute(element, name, value9.get()));
-  }
-  setAnyAttribute(element, name, value9);
-};
-var setAnyAttribute = function(element, name, value9) {
-  if (value9 == null) {
-    element.removeAttribute(name);
-  } else {
-    element.setAttribute(name, String(value9));
-  }
-};
-var setBoolean = function(element, name, value9) {
-  if (isReactive(value9)) {
-    return effect(() => setBooleanAttribute(element, name, value9.get()));
-  }
-  setBooleanAttribute(element, name, value9);
-};
-var setBooleanAttribute = function(element, name, value9) {
-  if (/^(|true)$/i.test(String(value9))) {
-    element.setAttribute(name, "");
-  } else {
-    element.removeAttribute(name);
-  }
-};
-var setClasses = function(element, name, value9) {
-  const classes = name.split(".").slice(1).filter((name2) => name2.length > 0);
-  if (classes.length === 0) {
-    return;
-  }
-  if (isReactive(value9)) {
-    return effect(() => updateClassList(element, classes, value9.get()));
-  }
-  updateClassList(element, classes, value9);
-};
-var setStyle = function(element, name, value9) {
-  if (!isStylableElement(element)) {
-    return;
-  }
-  const [, first, second] = name.split(".");
-  const property = first.trim();
-  const suffix = second?.trim();
-  if (property.length === 0 || suffix != null && suffix.length === 0) {
-    return;
-  }
-  if (isReactive(value9)) {
-    return effect(() => updateStyleProperty(element, property, suffix, value9.get()));
-  }
-  updateStyleProperty(element, property, suffix, value9);
-};
-var updateClassList = function(element, classes, value9) {
-  if (value9 === true) {
-    element.classList.add(...classes);
-  } else {
-    element.classList.remove(...classes);
-  }
-};
-var updateStyleProperty = function(element, property, suffix, value9) {
-  if (value9 == null || value9 === false || value9 === true && suffix == null) {
-    element.style.removeProperty(property);
-  } else {
-    element.style.setProperty(property, value9 === true ? String(suffix) : `${value9}${suffix ?? ""}`);
-  }
-};
-var booleanAttributes = new Set([
-  "checked",
-  "disabled",
-  "hidden",
-  "inert",
-  "multiple",
-  "open",
-  "readonly",
-  "required",
-  "selected"
-]);
 
 // src/bloom/node.ts
 function createNode(value9) {
@@ -273,11 +317,8 @@ var getIndex2 = function(value9) {
   const [, index] = /^bloom\.(\d+)$/.exec(value9) ?? [];
   return index == null ? -1 : +index;
 };
-function isStylableElement(element) {
-  return element instanceof HTMLElement || element instanceof SVGElement;
-}
-function mapNodes(values, node2) {
-  const children = Array.from(node2.childNodes);
+function mapNodes(values, node) {
+  const children = Array.from(node.childNodes);
   const { length } = children;
   let index = 0;
   for (;index < length; index += 1) {
@@ -293,7 +334,7 @@ function mapNodes(values, node2) {
       mapNodes(values, child);
     }
   }
-  return node2;
+  return node;
 }
 var setFunction = function(comment, callback) {
   const value9 = callback();
@@ -304,8 +345,8 @@ var setFunction = function(comment, callback) {
   }
 };
 var setNode = function(comment, value9) {
-  const node2 = createNode(value9);
-  comment.replaceWith(.../^documentfragment$/i.test(node2.constructor.name) ? Array.from(node2.childNodes) : [node2]);
+  const node = createNode(value9);
+  comment.replaceWith(.../^documentfragment$/i.test(node.constructor.name) ? Array.from(node.childNodes) : [node]);
 };
 var setReactive = function(comment, reactive3) {
   const text = document.createTextNode("");
@@ -334,7 +375,7 @@ var setValue2 = function(values, comment) {
 };
 
 // src/bloom/index.ts
-function bloom2(strings, ...expressions) {
+function bloom(strings, ...expressions) {
   const data = {
     expressions,
     strings,
@@ -343,8 +384,8 @@ function bloom2(strings, ...expressions) {
   };
   const instance = Object.create({
     grow() {
-      const html = getHtml(data);
-      const nodes = createNodes(html);
+      const html2 = getHtml(data);
+      const nodes = createNodes(html2);
       return mapNodes(data.values, nodes);
     }
   });
@@ -353,40 +394,6 @@ function bloom2(strings, ...expressions) {
   });
   return instance;
 }
-var getHtml = function(data) {
-  if (data.html.length > 0) {
-    return data.html;
-  }
-  const { length } = data.strings;
-  let index = 0;
-  for (;index < length; index += 1) {
-    data.html += getPart(data, data.strings[index], data.expressions[index]);
-  }
-  return data.html;
-};
-var getPart = function(data, prefix, expression) {
-  if (expression == null) {
-    return prefix;
-  }
-  if (typeof expression === "function" || expression instanceof Node || isBloom(expression)) {
-    data.values.push(expression);
-    return `${prefix}<!--bloom.${data.values.length - 1}-->`;
-  }
-  if (Array.isArray(expression)) {
-    const { length } = expression;
-    let html = "";
-    let index = 0;
-    for (;index < length; index += 1) {
-      html += getPart(data, "", expression[index]);
-    }
-    return `${prefix}${html}`;
-  }
-  return `${prefix}${expression}`;
-};
-function isBloom(value9) {
-  return value9?.$sentinel === true;
-}
 export {
-  isBloom,
-  bloom2 as bloom
+  bloom
 };

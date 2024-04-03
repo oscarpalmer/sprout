@@ -1,5 +1,5 @@
-import type {EventParameters} from './models';
-import {storeNode} from './store';
+import type {EventParameters} from '../models';
+import {storeNode} from '../store';
 
 export function addEvent(
 	element: Element,

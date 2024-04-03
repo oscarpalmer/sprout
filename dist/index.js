@@ -1,4 +1,4 @@
-// src/bloom/is.ts
+// src/bloom/helpers/is.ts
 function isBadAttribute(attribute) {
   const { name, value } = attribute;
   return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value);
@@ -148,7 +148,7 @@ function storeNode(node, data) {
 }
 var store = new WeakMap;
 
-// src/bloom/event.ts
+// src/bloom/helpers/event.ts
 function addEvent(element, attribute, value9) {
   element.removeAttribute(attribute);
   if (typeof value9 !== "function") {
@@ -171,22 +171,102 @@ var getParameters = function(attribute) {
   return { name, options };
 };
 
-// src/bloom/attribute.ts
-var getIndex = function(value9) {
-  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value9) ?? [];
-  return index == null ? -1 : +index;
+// src/bloom/attribute/any.ts
+function setAny(element, name, value9) {
+  const isBoolean = booleanAttributes.has(name) && name in element;
+  const isValue = name === "value" && name in element;
+  const callback = isBoolean ? setBooleanAttribute : setAnyAttribute;
+  if (isReactive(value9)) {
+    return effect(() => callback(element, name, value9.get(), isValue));
+  }
+  callback(element, name, value9, isValue);
+}
+var setAnyAttribute = function(element, name, value9, isValue) {
+  if (isValue) {
+    element.value = String(value9);
+    return;
+  }
+  if (value9 == null) {
+    element.removeAttribute(name);
+  } else {
+    element.setAttribute(name, String(value9));
+  }
 };
-var getSetter = function(name, allowAny) {
+var setBooleanAttribute = function(element, name, value9) {
+  element[name] = /^(|true)$/i.test(String(value9));
+};
+var booleanAttributes = new Set([
+  "checked",
+  "disabled",
+  "hidden",
+  "inert",
+  "multiple",
+  "open",
+  "readonly",
+  "required",
+  "selected"
+]);
+
+// src/bloom/attribute/classes.ts
+function setClasses(element, name, value9) {
+  const classes = name.split(".").slice(1).filter((name2) => name2.length > 0);
+  if (classes.length === 0) {
+    return;
+  }
+  if (isReactive(value9)) {
+    return effect(() => updateClassList(element, classes, value9.get()));
+  }
+  updateClassList(element, classes, value9);
+}
+var updateClassList = function(element, classes, value9) {
+  if (value9 === true) {
+    element.classList.add(...classes);
+  } else {
+    element.classList.remove(...classes);
+  }
+};
+
+// src/bloom/attribute/style.ts
+function setStyle(element, name, value9) {
+  if (!isStylableElement(element)) {
+    return;
+  }
+  const [, first, second] = name.split(".");
+  const property = first.trim();
+  const suffix = second?.trim();
+  if (property.length === 0 || suffix != null && suffix.length === 0) {
+    return;
+  }
+  if (isReactive(value9)) {
+    return effect(() => updateStyleProperty(element, property, suffix, value9.get()));
+  }
+  updateStyleProperty(element, property, suffix, value9);
+}
+var updateStyleProperty = function(element, property, suffix, value9) {
+  if (value9 == null || value9 === false || value9 === true && suffix == null) {
+    element.style.removeProperty(property);
+  } else {
+    element.style.setProperty(property, value9 === true ? String(suffix) : `${value9}${suffix ?? ""}`);
+  }
+};
+
+// src/bloom/attribute/index.ts
+var getAttributeEffect = function(name, allowAny) {
   switch (true) {
-    case booleanAttributes.has(name.toLowerCase()):
-      return setBoolean;
     case /^class\.\w/.test(name):
       return setClasses;
     case /^style\.\w/.test(name):
       return setStyle;
+    case allowAny:
+    case booleanAttributes.has(name):
+      return setAny;
     default:
-      return allowAny ? setAny : undefined;
+      break;
   }
+};
+var getIndex = function(value9) {
+  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value9) ?? [];
+  return index == null ? -1 : +index;
 };
 function mapAttributes(values, element) {
   const attributes = Array.from(element.attributes);
@@ -204,89 +284,13 @@ function mapAttributes(values, element) {
       addEvent(element, attribute.name, value9);
     } else {
       const isFunction = typeof value9 === "function";
-      const fx = getSetter(attribute.name, isFunction)?.(element, attribute.name, isFunction ? value9() : attribute.value);
+      const fx = getAttributeEffect(attribute.name, isFunction)?.(element, attribute.name, isFunction ? value9() : attribute.value);
       if (isEffect(fx)) {
         storeNode(element, { effect: fx });
       }
     }
   }
 }
-var setAny = function(element, name, value9) {
-  if (isReactive(value9)) {
-    return effect(() => setAnyAttribute(element, name, value9.get()));
-  }
-  setAnyAttribute(element, name, value9);
-};
-var setAnyAttribute = function(element, name, value9) {
-  if (value9 == null) {
-    element.removeAttribute(name);
-  } else {
-    element.setAttribute(name, String(value9));
-  }
-};
-var setBoolean = function(element, name, value9) {
-  if (isReactive(value9)) {
-    return effect(() => setBooleanAttribute(element, name, value9.get()));
-  }
-  setBooleanAttribute(element, name, value9);
-};
-var setBooleanAttribute = function(element, name, value9) {
-  if (/^(|true)$/i.test(String(value9))) {
-    element.setAttribute(name, "");
-  } else {
-    element.removeAttribute(name);
-  }
-};
-var setClasses = function(element, name, value9) {
-  const classes = name.split(".").slice(1).filter((name2) => name2.length > 0);
-  if (classes.length === 0) {
-    return;
-  }
-  if (isReactive(value9)) {
-    return effect(() => updateClassList(element, classes, value9.get()));
-  }
-  updateClassList(element, classes, value9);
-};
-var setStyle = function(element, name, value9) {
-  if (!isStylableElement(element)) {
-    return;
-  }
-  const [, first, second] = name.split(".");
-  const property = first.trim();
-  const suffix = second?.trim();
-  if (property.length === 0 || suffix != null && suffix.length === 0) {
-    return;
-  }
-  if (isReactive(value9)) {
-    return effect(() => updateStyleProperty(element, property, suffix, value9.get()));
-  }
-  updateStyleProperty(element, property, suffix, value9);
-};
-var updateClassList = function(element, classes, value9) {
-  if (value9 === true) {
-    element.classList.add(...classes);
-  } else {
-    element.classList.remove(...classes);
-  }
-};
-var updateStyleProperty = function(element, property, suffix, value9) {
-  if (value9 == null || value9 === false || value9 === true && suffix == null) {
-    element.style.removeProperty(property);
-  } else {
-    element.style.setProperty(property, value9 === true ? String(suffix) : `${value9}${suffix ?? ""}`);
-  }
-};
-var booleanAttributes = new Set([
-  "checked",
-  "disabled",
-  "hidden",
-  "inert",
-  "multiple",
-  "open",
-  "readonly",
-  "required",
-  "selected"
-]);
 
 // src/bloom/node.ts
 function createNode(value9) {
