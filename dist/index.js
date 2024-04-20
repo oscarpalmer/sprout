@@ -42,7 +42,7 @@ var getPartial = function(data, prefix, expression) {
   return `${prefix}${expression}`;
 };
 
-// node_modules/@oscarpalmer/atoms/dist/js/queue.mjs
+// node_modules/@oscarpalmer/sentinel/node_modules/@oscarpalmer/atoms/dist/js/queue.mjs
 if (globalThis._atomic_queued === undefined) {
   const queued = new Set;
   Object.defineProperty(globalThis, "_atomic_queued", {
@@ -394,7 +394,18 @@ function bloom(strings, ...expressions) {
   });
   return instance;
 }
-// src/petal/index.ts
+// src/petal/controller.ts
+var constructors = new Map;
+var controllers = new Map;
+
+class Controller {
+  element;
+  constructor(element) {
+    this.element = element;
+  }
+}
+
+// src/petal/observer.ts
 var getAttributes = function(from, to) {
   const fromValues = from.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
   const toValues = to.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
@@ -422,26 +433,31 @@ var observer = function(mutations) {
     }
   }
 };
-function petal(name, bud) {
-  if (buds.has(name)) {
-    throw new Error(`Petal '${name}' already exists`);
+function run(name) {
+  const elements = document.querySelectorAll(`[${attribute2}]`);
+  const { length } = elements;
+  let index = 0;
+  for (;index < length; index += 1) {
+    const element = elements[index];
+    if (name == null || (element.getAttribute(attribute2)?.includes(name) ?? false)) {
+      update(element, "");
+    }
   }
-  buds.set(name, bud);
 }
 var update = function(element, from) {
   const attributes = getAttributes(from, element.getAttribute(attribute2) ?? "");
-  let elementControllers = petals.get(element);
-  if (elementControllers === undefined) {
+  let elementControllers = controllers.get(element);
+  if (elementControllers == null) {
     elementControllers = new Set;
-    petals.set(element, elementControllers);
+    controllers.set(element, elementControllers);
   }
   let { length } = attributes[0];
   let index = 0;
   for (;index < length; index += 1) {
     const name = attributes[0][index];
-    const bud = buds.get(name);
-    const existing = Array.from(elementControllers).find((value9) => value9.constructor === bud);
-    if (existing !== undefined) {
+    const ctor = constructors.get(name);
+    const existing = Array.from(elementControllers).find((value9) => value9.constructor === ctor);
+    if (existing != null) {
       existing.disconnected();
       elementControllers.delete(existing);
     }
@@ -450,47 +466,37 @@ var update = function(element, from) {
   index = 0;
   for (;index < length; index += 1) {
     const name = attributes[1][index];
-    const bud = buds.get(name);
-    const none = Array.from(elementControllers).findIndex((value9) => value9.constructor === bud) === -1;
-    if (bud !== undefined && none) {
-      const petal2 = new bud(element);
-      petal2.connected();
-      elementControllers.add(petal2);
+    const ctor = constructors.get(name);
+    const none = Array.from(elementControllers).findIndex((value9) => value9.constructor === ctor) === -1;
+    if (ctor != null && none) {
+      const petal = new ctor(element);
+      petal.connected();
+      elementControllers.add(petal);
     }
   }
 };
-
-class Petal {
-  element;
-  constructor(element) {
-    this.element = element;
-  }
-  connected() {
-  }
-  disconnected() {
-  }
-}
 var attribute2 = "data-petal";
-var buds = new Map;
-var petals = new Map;
-var options = {
+new MutationObserver(observer).observe(document, {
   attributeFilter: [attribute2],
   attributeOldValue: true,
   attributes: true,
   childList: true,
   subtree: true
-};
-new MutationObserver(observer).observe(document, options);
-document.addEventListener("DOMContentLoaded", () => {
-  const elements = document.querySelectorAll(`[${attribute2}]`);
-  const { length } = elements;
-  let index = 0;
-  for (;index < length; index += 1) {
-    update(elements[index], "");
+});
+
+// src/petal/index.ts
+function petal(name, ctor) {
+  if (constructors.has(name)) {
+    throw new Error(`Petal '${name}' already exists`);
   }
+  constructors.set(name, ctor);
+  run(name);
+}
+document.addEventListener("DOMContentLoaded", () => {
+  run();
 });
 export {
   petal,
   bloom,
-  Petal
+  Controller
 };
