@@ -42,7 +42,7 @@ var getPartial = function(data, prefix, expression) {
   return `${prefix}${expression}`;
 };
 
-// node_modules/@oscarpalmer/atoms/dist/js/queue.mjs
+// node_modules/@oscarpalmer/sentinel/node_modules/@oscarpalmer/atoms/dist/js/queue.mjs
 if (globalThis._atomic_queued === undefined) {
   const queued = new Set;
   Object.defineProperty(globalThis, "_atomic_queued", {

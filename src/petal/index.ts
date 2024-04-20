@@ -1,18 +1,17 @@
-import {constructors, type ControllerConstructor} from './controller';
-import {run} from './observer';
+import type {ControllerConstructor} from './controllers/controller';
+import {observeDocument} from './observer/document.observer';
+import {controllers, createController} from './store/controller.store';
+
+const documentObserver = observeDocument();
 
 export function petal(name: string, ctor: ControllerConstructor): void {
-	if (constructors.has(name)) {
+	if (controllers.has(name)) {
 		throw new Error(`Petal '${name}' already exists`);
 	}
 
-	constructors.set(name, ctor);
+	createController(name, ctor);
 
-	run(name);
+	documentObserver.update();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-	run();
-});
-
-export {Controller} from './controller';
+export {Controller} from './controllers/controller';

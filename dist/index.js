@@ -394,22 +394,75 @@ function bloom(strings, ...expressions) {
   });
   return instance;
 }
-// src/petal/controller.ts
-var constructors = new Map;
-var controllers = new Map;
+// src/petal/controllers/controller.ts
+var attribute2 = "data-petal";
 
 class Controller {
-  element;
-  constructor(element) {
-    this.element = element;
+  context;
+  get element() {
+    return this.context.element;
+  }
+  get identifier() {
+    return this.context.identifier;
+  }
+  constructor(context) {
+    this.context = context;
   }
 }
 
-// src/petal/observer.ts
-var getAttributes = function(from, to) {
+// src/petal/controllers/context.ts
+function createContext(name, element, ctor) {
+  const context = Object.create(null);
+  Object.defineProperties(context, {
+    element: {
+      value: element
+    },
+    identifier: {
+      value: name
+    }
+  });
+  const controller = new ctor(context);
+  Object.defineProperty(context, "controller", {
+    value: controller
+  });
+  controller.connected?.();
+  return context;
+}
+
+// src/petal/store/controller.store.ts
+function addController(name, element) {
+  const controller = controllers.get(name);
+  if (controller != null && !controller.instances.has(element)) {
+    controller.instances.set(element, createContext(name, element, controller.constructor));
+  }
+}
+function createController(name, ctor) {
+  if (!controllers.has(name)) {
+    controllers.set(name, {
+      constructor: ctor,
+      instances: new Map
+    });
+  }
+}
+function removeController(name, element) {
+  const stored = controllers.get(name);
+  if (stored == null) {
+    return;
+  }
+  const instance = stored.instances.get(element);
+  if (instance == null) {
+    return;
+  }
+  stored.instances.delete(element);
+  instance.controller.disconnected?.();
+}
+var controllers = new Map;
+
+// src/petal/observer/observer.ts
+function getAttributes(from, to) {
   const fromValues = from.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
   const toValues = to.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
-  const result = [[], []];
+  const attributes = [[], []];
   for (let outer = 0;outer < 2; outer += 1) {
     const values = outer === 0 ? fromValues : toValues;
     const other = outer === 1 ? fromValues : toValues;
@@ -417,84 +470,106 @@ var getAttributes = function(from, to) {
     for (let inner = 0;inner < length; inner += 1) {
       const value9 = values[inner];
       if (!other.includes(value9)) {
-        result[outer].push(value9);
+        attributes[outer].push(value9);
       }
     }
   }
-  return result;
-};
-var observer = function(mutations) {
-  const { length } = mutations;
-  let index = 0;
-  for (;index < length; index += 1) {
-    const mutation = mutations[index];
-    if (mutation.type === "attributes" && mutation.target instanceof Element) {
-      update(mutation.target, mutation.oldValue ?? "");
-    }
-  }
-};
-function run(name) {
-  const elements = document.querySelectorAll(`[${attribute2}]`);
-  const { length } = elements;
-  let index = 0;
-  for (;index < length; index += 1) {
-    const element = elements[index];
-    if (name == null || (element.getAttribute(attribute2)?.includes(name) ?? false)) {
-      update(element, "");
-    }
-  }
+  return attributes;
 }
-var update = function(element, from) {
-  const attributes = getAttributes(from, element.getAttribute(attribute2) ?? "");
-  let elementControllers = controllers.get(element);
-  if (elementControllers == null) {
-    elementControllers = new Set;
-    controllers.set(element, elementControllers);
-  }
-  let { length } = attributes[0];
-  let index = 0;
-  for (;index < length; index += 1) {
-    const name = attributes[0][index];
-    const ctor = constructors.get(name);
-    const existing = Array.from(elementControllers).find((value9) => value9.constructor === ctor);
-    if (existing != null) {
-      existing.disconnected();
-      elementControllers.delete(existing);
+function createObserver(element, options, handlers) {
+  let frame;
+  const observer = new MutationObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.type === "childList") {
+        instance.handleNodes(entry.addedNodes, true);
+        instance.handleNodes(entry.removedNodes, false);
+      } else if (entry.target instanceof Element) {
+        instance.handleAttribute(entry.target, entry.attributeName ?? "", entry.oldValue ?? "", false);
+      }
     }
-  }
-  length = attributes[1].length;
-  index = 0;
-  for (;index < length; index += 1) {
-    const name = attributes[1][index];
-    const ctor = constructors.get(name);
-    const none = Array.from(elementControllers).findIndex((value9) => value9.constructor === ctor) === -1;
-    if (ctor != null && none) {
-      const petal = new ctor(element);
-      petal.connected();
-      elementControllers.add(petal);
+  });
+  const instance = Object.create({
+    ...handlers,
+    handleNodes(nodes, added) {
+      for (const node2 of nodes) {
+        if (node2 instanceof Element) {
+          this.handleElement(node2, added);
+          this.handleNodes(node2.childNodes, added);
+        }
+      }
+    },
+    start() {
+      observer.observe(element, options);
+      this.update();
+    },
+    stop() {
+      observer.disconnect();
+    },
+    update() {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        this.handleNodes([element], true);
+      });
     }
-  }
-};
-var attribute2 = "data-petal";
-new MutationObserver(observer).observe(document, {
-  attributeFilter: [attribute2],
+  });
+  instance.start();
+  return instance;
+}
+var options = {
   attributeOldValue: true,
   attributes: true,
   childList: true,
   subtree: true
-});
+};
+
+// src/petal/observer/document.observer.ts
+var handleChanges = function(element, newValue, oldValue) {
+  const attributes = getAttributes(oldValue, newValue);
+  for (const names of attributes) {
+    const added = attributes.indexOf(names) === 1;
+    for (const name of names) {
+      if (added) {
+        addController(name, element);
+      } else {
+        removeController(name, element);
+      }
+    }
+  }
+};
+function observeDocument() {
+  return createObserver(document.body, {
+    ...options,
+    attributeFilter: [attribute2]
+  }, {
+    handleAttribute(element, name, value9, removed) {
+      let oldValue = value9;
+      let newValue = element.getAttribute(name) || "";
+      if (newValue === oldValue) {
+        return;
+      }
+      if (removed) {
+        oldValue = newValue;
+        newValue = "";
+      }
+      handleChanges(element, newValue, oldValue);
+    },
+    handleElement(element, added) {
+      if (element.hasAttribute(attribute2)) {
+        this.handleAttribute(element, attribute2, "", !added);
+      }
+    }
+  });
+}
 
 // src/petal/index.ts
 function petal(name, ctor) {
-  if (constructors.has(name)) {
+  if (controllers.has(name)) {
     throw new Error(`Petal '${name}' already exists`);
   }
-  constructors.set(name, ctor);
-  run(name);
+  createController(name, ctor);
+  documentObserver.update();
 }
-document.addEventListener("DOMContentLoaded", () => {
-  run();
-});
+var documentObserver = observeDocument();
 export {
   petal,
   bloom,
