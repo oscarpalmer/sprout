@@ -9,6 +9,7 @@ import {
 
 type Attributes = {
 	action: string;
+	target: string;
 };
 
 function handleAction(
@@ -61,6 +62,12 @@ function handleChanges(
 	element: Element,
 	oldValue: string,
 	newValue: string,
+	callback: (
+		context: Context,
+		element: Element,
+		name: string,
+		added: boolean,
+	) => void,
 ): void {
 	const attributes = getAttributes(oldValue, newValue);
 
@@ -68,8 +75,21 @@ function handleChanges(
 		const added = attributes.indexOf(names) === 1;
 
 		for (const name of names) {
-			handleAction(context, element, name, added);
+			callback(context, element, name, added);
 		}
+	}
+}
+
+function handleTarget(
+	context: Context,
+	element: Element,
+	target: string,
+	added: boolean,
+): void {
+	if (added) {
+		context.targets.add(target, element);
+	} else {
+		context.targets.remove(target, element);
 	}
 }
 
@@ -77,13 +97,20 @@ export function observeController(
 	context: Context,
 	attributes: Attributes,
 ): Observer {
-	const {action: actionAttribute} = attributes;
+	const {action: actionAttribute, target: targetAttribute} = attributes;
+
+	const attributeFilter = [actionAttribute, targetAttribute];
+
+	const callbacks = {
+		[actionAttribute]: handleAction,
+		[targetAttribute]: handleTarget,
+	};
 
 	return createObserver(
 		context.element,
 		{
 			...options,
-			attributeFilter: [actionAttribute],
+			attributeFilter,
 		},
 		{
 			handleAttribute(element, name, value, removed) {
@@ -99,7 +126,7 @@ export function observeController(
 					newValue = '';
 				}
 
-				handleChanges(context, element, oldValue, newValue);
+				handleChanges(context, element, oldValue, newValue, callbacks[name]);
 			},
 			handleElement(element, added) {
 				const attributes = Array.from(element.attributes);
@@ -110,7 +137,7 @@ export function observeController(
 				for (; index < length; index += 1) {
 					const attribute = attributes[index].name;
 
-					if (attribute === actionAttribute) {
+					if (attributeFilter.includes(attribute)) {
 						this.handleAttribute(element, attribute, '', !added);
 					}
 				}

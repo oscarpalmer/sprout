@@ -1,15 +1,17 @@
 import {observeController} from '../observer/controller.observer';
 import type {Observer} from '../observer/observer';
 import {createActions, type Actions} from '../store/action.store';
+import {createTargets, type Targets} from '../store/target.store';
 import type {Controller, ControllerConstructor} from './controller';
 
 export type Context = {
-	readonly actions: Actions;
-	readonly controller: Controller;
-	readonly element: Element;
-	readonly identifier: string;
-	readonly observer: Observer;
-};
+		readonly actions: Actions;
+		readonly controller: Controller;
+		readonly element: Element;
+		readonly identifier: string;
+		readonly observer: Observer;
+		readonly targets: Targets;
+	};
 
 export function createContext(
 	name: string,
@@ -28,6 +30,9 @@ export function createContext(
 		identifier: {
 			value: name,
 		},
+		targets: {
+			value: createTargets(),
+		},
 	});
 
 	const controller = new ctor(context);
@@ -39,6 +44,7 @@ export function createContext(
 		observer: {
 			value: observeController(context, {
 				action: `data-${name}-action`,
+				target: `data-${name}-target`,
 			}),
 		},
 	});

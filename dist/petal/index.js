@@ -149,20 +149,32 @@ var handleAction = function(context, element, action, added) {
   });
   context.actions.add(action, element);
 };
-var handleChanges = function(context, element, oldValue, newValue) {
+var handleChanges = function(context, element, oldValue, newValue, callback) {
   const attributes = getAttributes(oldValue, newValue);
   for (const names of attributes) {
     const added = attributes.indexOf(names) === 1;
     for (const name of names) {
-      handleAction(context, element, name, added);
+      callback(context, element, name, added);
     }
   }
 };
+var handleTarget = function(context, element, target, added) {
+  if (added) {
+    context.targets.add(target, element);
+  } else {
+    context.targets.remove(target, element);
+  }
+};
 function observeController(context, attributes) {
-  const { action: actionAttribute } = attributes;
+  const { action: actionAttribute, target: targetAttribute } = attributes;
+  const attributeFilter = [actionAttribute, targetAttribute];
+  const callbacks = {
+    [actionAttribute]: handleAction,
+    [targetAttribute]: handleTarget
+  };
   return createObserver(context.element, {
     ...options,
-    attributeFilter: [actionAttribute]
+    attributeFilter
   }, {
     handleAttribute(element, name, value, removed) {
       let oldValue = value;
@@ -174,7 +186,7 @@ function observeController(context, attributes) {
         oldValue = newValue;
         newValue = "";
       }
-      handleChanges(context, element, oldValue, newValue);
+      handleChanges(context, element, oldValue, newValue, callbacks[name]);
     },
     handleElement(element, added) {
       const attributes2 = Array.from(element.attributes);
@@ -182,7 +194,7 @@ function observeController(context, attributes) {
       let index = 0;
       for (;index < length; index += 1) {
         const attribute2 = attributes2[index].name;
-        if (attribute2 === actionAttribute) {
+        if (attributeFilter.includes(attribute2)) {
           this.handleAttribute(element, attribute2, "", !added);
         }
       }
@@ -239,6 +251,34 @@ function createActions() {
   return instance;
 }
 
+// src/petal/store/target.store.ts
+function createTargets() {
+  const store = new Map;
+  const instance = Object.create({
+    add(name, element) {
+      let targets = store.get(name);
+      if (targets == null) {
+        targets = new Set;
+        store.set(name, targets);
+      }
+      targets.add(element);
+    },
+    clear() {
+      for (const [, targets] of store) {
+        targets.clear();
+      }
+      store.clear();
+    },
+    get(name) {
+      return Array.from(store.get(name) ?? []);
+    },
+    remove(name, element) {
+      store.get(name)?.delete(element);
+    }
+  });
+  return instance;
+}
+
 // src/petal/controllers/context.ts
 function createContext(name, element, ctor) {
   const context = Object.create(null);
@@ -251,6 +291,9 @@ function createContext(name, element, ctor) {
     },
     identifier: {
       value: name
+    },
+    targets: {
+      value: createTargets()
     }
   });
   const controller2 = new ctor(context);
@@ -260,7 +303,8 @@ function createContext(name, element, ctor) {
     },
     observer: {
       value: observeController(context, {
-        action: `data-${name}-action`
+        action: `data-${name}-action`,
+        target: `data-${name}-target`
       })
     }
   });
@@ -295,6 +339,7 @@ function removeController(name, element) {
   stored.instances.delete(element);
   instance.actions.clear();
   instance.observer.stop();
+  instance.targets.clear();
   instance.controller.disconnected?.();
 }
 var controllers = new Map;

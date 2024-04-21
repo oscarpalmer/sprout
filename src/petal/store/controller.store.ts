@@ -48,6 +48,7 @@ export function removeController(name: string, element: Element): void {
 
 	instance.actions.clear();
 	instance.observer.stop();
+	instance.targets.clear();
 
 	instance.controller.disconnected?.();
 }
