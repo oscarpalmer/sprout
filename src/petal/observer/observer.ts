@@ -65,7 +65,10 @@ export function createObserver(
 			if (entry.type === 'childList') {
 				instance.handleNodes(entry.addedNodes, true);
 				instance.handleNodes(entry.removedNodes, false);
-			} else if (entry.target instanceof Element) {
+			} else if (
+				entry.type === 'attributes' &&
+				entry.target instanceof Element
+			) {
 				instance.handleAttribute(
 					entry.target,
 					entry.attributeName ?? '',

@@ -6,6 +6,9 @@ class Controller {
   get element() {
     return this.context.element;
   }
+  get data() {
+    return this.context.data.value;
+  }
   get identifier() {
     return this.context.identifier;
   }
@@ -80,7 +83,7 @@ function createObserver(element, options, handlers) {
       if (entry.type === "childList") {
         instance.handleNodes(entry.addedNodes, true);
         instance.handleNodes(entry.removedNodes, false);
-      } else if (entry.target instanceof Element) {
+      } else if (entry.type === "attributes" && entry.target instanceof Element) {
         instance.handleAttribute(entry.target, entry.attributeName ?? "", entry.oldValue ?? "", false);
       }
     }
@@ -158,6 +161,15 @@ var handleChanges = function(context, element, oldValue, newValue, callback) {
     }
   }
 };
+var handleData = function(context, name, value) {
+  let data;
+  try {
+    data = JSON.parse(value);
+  } catch (_) {
+    data = value;
+  }
+  context.data.value[name] = data;
+};
 var handleTarget = function(context, element, target, added) {
   if (added) {
     context.targets.add(target, element);
@@ -166,15 +178,18 @@ var handleTarget = function(context, element, target, added) {
   }
 };
 function observeController(context, attributes) {
-  const { action: actionAttribute, target: targetAttribute } = attributes;
-  const attributeFilter = [actionAttribute, targetAttribute];
+  const {
+    action: actionAttribute,
+    data: dataAttribute,
+    target: targetAttribute
+  } = attributes;
   const callbacks = {
     [actionAttribute]: handleAction,
     [targetAttribute]: handleTarget
   };
+  const names = [actionAttribute, targetAttribute];
   return createObserver(context.element, {
-    ...options,
-    attributeFilter
+    ...options
   }, {
     handleAttribute(element, name, value, removed) {
       let oldValue = value;
@@ -186,17 +201,18 @@ function observeController(context, attributes) {
         oldValue = newValue;
         newValue = "";
       }
-      handleChanges(context, element, oldValue, newValue, callbacks[name]);
+      if (names.includes(name)) {
+        handleChanges(context, element, oldValue, newValue, callbacks[name]);
+      } else if (name.startsWith(dataAttribute)) {
+        handleData(context, name.slice(dataAttribute.length), newValue);
+      }
     },
     handleElement(element, added) {
       const attributes2 = Array.from(element.attributes);
       const { length } = attributes2;
       let index = 0;
       for (;index < length; index += 1) {
-        const attribute2 = attributes2[index].name;
-        if (attributeFilter.includes(attribute2)) {
-          this.handleAttribute(element, attribute2, "", !added);
-        }
+        this.handleAttribute(element, attributes2[index].name, "", !added);
       }
     }
   });
@@ -204,10 +220,10 @@ function observeController(context, attributes) {
 
 // src/petal/store/action.store.ts
 function createActions() {
-  const actions = new Map;
-  const instance = Object.create({
+  const store = new Map;
+  return Object.create({
     add(name, element) {
-      const action = actions.get(name);
+      const action = store.get(name);
       if (action == null) {
         return;
       }
@@ -215,17 +231,17 @@ function createActions() {
       element.addEventListener(action.type, action.callback, action.options);
     },
     clear() {
-      for (const [, action] of actions) {
+      for (const [, action] of store) {
         for (const target of action.targets) {
           target.removeEventListener(action.type, action.callback, action.options);
         }
         action.targets.clear();
       }
-      actions.clear();
+      store.clear();
     },
     create(parameters) {
-      if (!actions.has(parameters.name)) {
-        actions.set(parameters.name, {
+      if (!store.has(parameters.name)) {
+        store.set(parameters.name, {
           callback: parameters.callback,
           options: parameters.options,
           targets: new Set,
@@ -234,19 +250,65 @@ function createActions() {
       }
     },
     has(name) {
-      return actions.has(name);
+      return store.has(name);
     },
     remove(name, element) {
-      const action = actions.get(name);
+      const action = store.get(name);
       if (action == null) {
         return;
       }
       element.removeEventListener(action.type, action.callback);
       action.targets.delete(element);
       if (action.targets.size === 0) {
-        actions.delete(name);
+        store.delete(name);
       }
     }
+  });
+}
+
+// node_modules/@oscarpalmer/atoms/dist/js/string.mjs
+var getString = function(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value !== "object" || value == null) {
+    return String(value);
+  }
+  const valueOff = value.valueOf?.() ?? value;
+  const asString = valueOff?.toString?.() ?? String(valueOff);
+  return asString.startsWith("[object ") ? JSON.stringify(value) : asString;
+};
+
+// node_modules/@oscarpalmer/atoms/dist/js/is.mjs
+var isNullableOrWhitespace = function(value) {
+  return value == null || /^\s*$/.test(getString(value));
+};
+
+// src/petal/store/data.store.ts
+function createData(identifier, context) {
+  const prefix = `data-${identifier}-data-`;
+  const instance = Object.create(null);
+  Object.defineProperty(instance, "value", {
+    value: new Proxy({}, {
+      set(target, property, value) {
+        const previous = JSON.stringify(Reflect.get(target, property));
+        const next = JSON.stringify(value);
+        if (Object.is(previous, next)) {
+          return true;
+        }
+        const result = Reflect.set(target, property, value);
+        if (result) {
+          requestAnimationFrame(() => {
+            if (isNullableOrWhitespace(value)) {
+              context.element.removeAttribute(`${prefix}${String(property)}`);
+            } else {
+              context.element.setAttribute(`${prefix}${String(property)}`, next);
+            }
+          });
+        }
+        return result;
+      }
+    })
   });
   return instance;
 }
@@ -286,6 +348,9 @@ function createContext(name, element, ctor) {
     actions: {
       value: createActions()
     },
+    data: {
+      value: createData(name, context)
+    },
     element: {
       value: element
     },
@@ -304,6 +369,7 @@ function createContext(name, element, ctor) {
     observer: {
       value: observeController(context, {
         action: `data-${name}-action`,
+        data: `data-${name}-data-`,
         target: `data-${name}-target`
       })
     }

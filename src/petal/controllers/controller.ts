@@ -1,12 +1,17 @@
+import type {PlainObject} from '@oscarpalmer/atoms/models';
 import type {Context} from './context';
 
 export const attribute = 'data-petal';
 
 export type ControllerConstructor = new (context: Context) => Controller;
 
-export abstract class Controller {
+export abstract class Controller<Model extends PlainObject = PlainObject> {
 	get element(): Element {
 		return this.context.element;
+	}
+
+	get data(): Model {
+		return this.context.data.value as Model;
 	}
 
 	get identifier(): string {

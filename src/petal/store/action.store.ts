@@ -22,11 +22,11 @@ type Parameters = {
 };
 
 export function createActions() {
-	const actions = new Map<string, Action>();
+	const store = new Map<string, Action>();
 
-	const instance = Object.create({
+	return Object.create({
 		add(name, element) {
-			const action = actions.get(name);
+			const action = store.get(name);
 
 			if (action == null) {
 				return;
@@ -37,7 +37,7 @@ export function createActions() {
 			element.addEventListener(action.type, action.callback, action.options);
 		},
 		clear() {
-			for (const [, action] of actions) {
+			for (const [, action] of store) {
 				for (const target of action.targets) {
 					target.removeEventListener(
 						action.type,
@@ -49,11 +49,11 @@ export function createActions() {
 				action.targets.clear();
 			}
 
-			actions.clear();
+			store.clear();
 		},
 		create(parameters) {
-			if (!actions.has(parameters.name)) {
-				actions.set(parameters.name, {
+			if (!store.has(parameters.name)) {
+				store.set(parameters.name, {
 					callback: parameters.callback,
 					options: parameters.options,
 					targets: new Set(),
@@ -62,10 +62,10 @@ export function createActions() {
 			}
 		},
 		has(name) {
-			return actions.has(name);
+			return store.has(name);
 		},
 		remove(name, element) {
-			const action = actions.get(name);
+			const action = store.get(name);
 
 			if (action == null) {
 				return;
@@ -76,10 +76,8 @@ export function createActions() {
 			action.targets.delete(element);
 
 			if (action.targets.size === 0) {
-				actions.delete(name);
+				store.delete(name);
 			}
 		},
 	} as Actions);
-
-	return instance;
 }

@@ -9,6 +9,7 @@ import {
 
 type Attributes = {
 	action: string;
+	data: string;
 	target: string;
 };
 
@@ -80,6 +81,18 @@ function handleChanges(
 	}
 }
 
+function handleData(context: Context, name: string, value: string): void {
+	let data: unknown;
+
+	try {
+		data = JSON.parse(value);
+	} catch (_) {
+		data = value;
+	}
+
+	context.data.value[name] = data;
+}
+
 function handleTarget(
 	context: Context,
 	element: Element,
@@ -97,20 +110,23 @@ export function observeController(
 	context: Context,
 	attributes: Attributes,
 ): Observer {
-	const {action: actionAttribute, target: targetAttribute} = attributes;
-
-	const attributeFilter = [actionAttribute, targetAttribute];
+	const {
+		action: actionAttribute,
+		data: dataAttribute,
+		target: targetAttribute,
+	} = attributes;
 
 	const callbacks = {
 		[actionAttribute]: handleAction,
 		[targetAttribute]: handleTarget,
 	};
 
+	const names = [actionAttribute, targetAttribute];
+
 	return createObserver(
 		context.element,
 		{
 			...options,
-			attributeFilter,
 		},
 		{
 			handleAttribute(element, name, value, removed) {
@@ -126,7 +142,11 @@ export function observeController(
 					newValue = '';
 				}
 
-				handleChanges(context, element, oldValue, newValue, callbacks[name]);
+				if (names.includes(name)) {
+					handleChanges(context, element, oldValue, newValue, callbacks[name]);
+				} else if (name.startsWith(dataAttribute)) {
+					handleData(context, name.slice(dataAttribute.length), newValue);
+				}
 			},
 			handleElement(element, added) {
 				const attributes = Array.from(element.attributes);
@@ -135,11 +155,7 @@ export function observeController(
 				let index = 0;
 
 				for (; index < length; index += 1) {
-					const attribute = attributes[index].name;
-
-					if (attributeFilter.includes(attribute)) {
-						this.handleAttribute(element, attribute, '', !added);
-					}
+					this.handleAttribute(element, attributes[index].name, '', !added);
 				}
 			},
 		},
