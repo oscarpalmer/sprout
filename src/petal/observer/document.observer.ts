@@ -37,7 +37,7 @@ export function observeDocument(): Observer {
 		{
 			handleAttribute(element, name, value, removed) {
 				let oldValue = value;
-				let newValue = element.getAttribute(name) || '';
+				let newValue = element.getAttribute(name) ?? '';
 
 				if (newValue === oldValue) {
 					return;

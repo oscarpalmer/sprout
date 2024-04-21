@@ -46,5 +46,8 @@ export function removeController(name: string, element: Element): void {
 
 	stored.instances.delete(element);
 
+	instance.actions.clear();
+	instance.observer.stop();
+
 	instance.controller.disconnected?.();
 }
