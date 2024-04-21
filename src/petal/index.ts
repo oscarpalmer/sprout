@@ -1,4 +1,4 @@
-import type {ControllerConstructor} from './controllers/controller';
+import type {ControllerConstructor} from './controller/controller';
 import {observeDocument} from './observer/document.observer';
 import {controllers, createController} from './store/controller.store';
 
@@ -14,4 +14,4 @@ export function petal(name: string, ctor: ControllerConstructor): void {
 	documentObserver.update();
 }
 
-export {Controller} from './controllers/controller';
+export {Controller} from './controller/controller';

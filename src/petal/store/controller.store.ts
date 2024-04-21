@@ -1,5 +1,5 @@
-import {createContext, type Context} from '../controllers/context';
-import type {ControllerConstructor} from '../controllers/controller';
+import {createContext, type Context} from '../controller/context';
+import type {ControllerConstructor} from '../controller/controller';
 
 type StoredController = {
 	constructor: ControllerConstructor;

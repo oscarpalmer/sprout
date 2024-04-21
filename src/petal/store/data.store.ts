@@ -1,6 +1,6 @@
 import {isNullableOrWhitespace} from '@oscarpalmer/atoms/is';
 import type {PlainObject} from '@oscarpalmer/atoms/models';
-import type {Context} from '../controllers/context';
+import type {Context} from '../controller/context';
 
 export type Data = {
 	value: PlainObject;

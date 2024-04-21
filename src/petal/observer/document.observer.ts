@@ -1,4 +1,4 @@
-import {attribute} from '../controllers/controller';
+import {attribute} from '../controller/controller';
 import {addController, removeController} from '../store/controller.store';
 import {
 	type Observer,

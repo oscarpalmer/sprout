@@ -1,4 +1,4 @@
-import type {Context} from '../controllers/context';
+import type {Context} from '../controller/context';
 import {getEventParameters} from '../helpers/event';
 import {
 	type Observer,
