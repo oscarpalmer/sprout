@@ -1,9 +1,3 @@
-export declare class Petal {
-    readonly element: Element;
-    constructor(element: Element);
-    connected(): void;
-    disconnected(): void;
-}
-type Bud = new (element: Element) => Petal;
-export declare function petal(name: string, bud: Bud): void;
-export {};
+import type { ControllerConstructor } from './controller/controller';
+export declare function petal(name: string, ctor: ControllerConstructor): void;
+export { Controller } from './controller/controller';

@@ -1,4 +1,4 @@
-// src/petal/controllers/controller.ts
+// src/petal/controller/controller.ts
 var attribute = "data-petal";
 
 class Controller {
@@ -341,7 +341,7 @@ function createTargets() {
   return instance;
 }
 
-// src/petal/controllers/context.ts
+// src/petal/controller/context.ts
 function createContext(name, element, ctor) {
   const context = Object.create(null);
   Object.defineProperties(context, {
