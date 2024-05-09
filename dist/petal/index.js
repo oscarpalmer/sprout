@@ -39,7 +39,7 @@ var getOptions = function(options) {
   return {
     capture: items.includes("capture") || items.includes("c"),
     once: items.includes("once") || items.includes("o"),
-    passive: items.includes("passive") || items.includes("p")
+    passive: !items.includes("active") && !items.includes("a")
   };
 };
 var getType = function(element) {
@@ -123,7 +123,7 @@ var options = {
 };
 
 // src/petal/observer/controller.observer.ts
-var handleAction = function(context, element, action, added) {
+var handleAction = function(context, element, action, added, handler) {
   if (context.actions.has(action)) {
     if (added) {
       context.actions.add(action, element);
@@ -139,7 +139,7 @@ var handleAction = function(context, element, action, added) {
   if (parameters == null) {
     return;
   }
-  const callback = context.controller[parameters.callback];
+  const callback = handler ?? context.controller[parameters.callback];
   if (typeof callback !== "function") {
     return;
   }
@@ -170,6 +170,16 @@ var handleData = function(context, name, value) {
   }
   context.data.value[name] = data;
 };
+var handleInput = function(context, element, action, added) {
+  if (element instanceof HTMLInputElement) {
+    handleAction(context, element, "input", added, function() {
+      context.data.value[action] = element.value;
+    });
+  }
+};
+var handleOutput = function(context, element, output, added) {
+  handleTarget(context, element, `output:${output}`, added);
+};
 var handleTarget = function(context, element, target, added) {
   if (added) {
     context.targets.add(target, element);
@@ -181,13 +191,22 @@ function observeController(context, attributes) {
   const {
     action: actionAttribute,
     data: dataAttribute,
+    input: inputAttribute,
+    output: outputAttribute,
     target: targetAttribute
   } = attributes;
   const callbacks = {
     [actionAttribute]: handleAction,
+    [inputAttribute]: handleInput,
+    [outputAttribute]: handleOutput,
     [targetAttribute]: handleTarget
   };
-  const names = [actionAttribute, targetAttribute];
+  const names = [
+    actionAttribute,
+    inputAttribute,
+    outputAttribute,
+    targetAttribute
+  ];
   return createObserver(context.element, {
     ...options
   }, {
@@ -285,25 +304,36 @@ var isNullableOrWhitespace = function(value) {
 };
 
 // src/petal/store/data.store.ts
+var setValue = function(context, prefix, name, original, stringified) {
+  const { element } = context;
+  if (isNullableOrWhitespace(original)) {
+    element.removeAttribute(`${prefix}${name}`);
+  } else {
+    element.setAttribute(`${prefix}${name}`, stringified);
+  }
+  const outputs = context.targets.get(`output:${name}`);
+  for (const output of outputs) {
+    output.textContent = stringified;
+  }
+};
 function createData(identifier, context) {
+  const frames = {};
   const prefix = `data-${identifier}-data-`;
   const instance = Object.create(null);
   Object.defineProperty(instance, "value", {
     value: new Proxy({}, {
       set(target, property, value) {
-        const previous = JSON.stringify(Reflect.get(target, property));
-        const next = JSON.stringify(value);
+        const previous = getString(Reflect.get(target, property));
+        const next = getString(value);
         if (Object.is(previous, next)) {
           return true;
         }
         const result = Reflect.set(target, property, value);
         if (result) {
-          requestAnimationFrame(() => {
-            if (isNullableOrWhitespace(value)) {
-              context.element.removeAttribute(`${prefix}${String(property)}`);
-            } else {
-              context.element.setAttribute(`${prefix}${String(property)}`, next);
-            }
+          const name = String(property);
+          cancelAnimationFrame(frames[name]);
+          frames[name] = requestAnimationFrame(() => {
+            setValue(context, prefix, name, value, next);
           });
         }
         return result;
@@ -370,6 +400,8 @@ function createContext(name, element, ctor) {
       value: observeController(context, {
         action: `data-${name}-action`,
         data: `data-${name}-data-`,
+        input: `data-${name}-input`,
+        output: `data-${name}-output`,
         target: `data-${name}-target`
       })
     }

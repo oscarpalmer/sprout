@@ -43,7 +43,7 @@ function getOptions(options: string): AddEventListenerOptions {
 	return {
 		capture: items.includes('capture') || items.includes('c'),
 		once: items.includes('once') || items.includes('o'),
-		passive: items.includes('passive') || items.includes('p'),
+		passive: !items.includes('active') && !items.includes('a'),
 	};
 }
 

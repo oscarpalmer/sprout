@@ -1,12 +1,36 @@
 import {isNullableOrWhitespace} from '@oscarpalmer/atoms/is';
 import type {PlainObject} from '@oscarpalmer/atoms/models';
+import {getString} from '@oscarpalmer/atoms/string';
 import type {Context} from '../controller/context';
 
 export type Data = {
 	value: PlainObject;
 };
 
+function setValue(
+	context: Context,
+	prefix: string,
+	name: string,
+	original: unknown,
+	stringified: string,
+): void {
+	const {element} = context;
+
+	if (isNullableOrWhitespace(original)) {
+		element.removeAttribute(`${prefix}${name}`);
+	} else {
+		element.setAttribute(`${prefix}${name}`, stringified);
+	}
+
+	const outputs = context.targets.get(`output:${name}`);
+
+	for (const output of outputs) {
+		output.textContent = stringified;
+	}
+}
+
 export function createData(identifier: string, context: Context): Data {
+	const frames: Record<string, number> = {};
 	const prefix = `data-${identifier}-data-`;
 
 	const instance = Object.create(null);
@@ -16,8 +40,8 @@ export function createData(identifier: string, context: Context): Data {
 			{},
 			{
 				set(target, property, value) {
-					const previous = JSON.stringify(Reflect.get(target, property));
-					const next = JSON.stringify(value);
+					const previous = getString(Reflect.get(target, property));
+					const next = getString(value);
 
 					if (Object.is(previous, next)) {
 						return true;
@@ -26,15 +50,12 @@ export function createData(identifier: string, context: Context): Data {
 					const result = Reflect.set(target, property, value);
 
 					if (result) {
-						requestAnimationFrame(() => {
-							if (isNullableOrWhitespace(value)) {
-								context.element.removeAttribute(`${prefix}${String(property)}`);
-							} else {
-								context.element.setAttribute(
-									`${prefix}${String(property)}`,
-									next,
-								);
-							}
+						const name = String(property);
+
+						cancelAnimationFrame(frames[name]);
+
+						frames[name] = requestAnimationFrame(() => {
+							setValue(context, prefix, name, value, next);
 						});
 					}
 

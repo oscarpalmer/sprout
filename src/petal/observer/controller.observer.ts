@@ -10,6 +10,8 @@ import {
 type Attributes = {
 	action: string;
 	data: string;
+	input: string;
+	output: string;
 	target: string;
 };
 
@@ -18,6 +20,7 @@ function handleAction(
 	element: Element,
 	action: string,
 	added: boolean,
+	handler?: (event: Event) => void,
 ): void {
 	if (context.actions.has(action)) {
 		if (added) {
@@ -39,9 +42,11 @@ function handleAction(
 		return;
 	}
 
-	const callback = (context.controller as any)[parameters.callback] as (
-		event: Event,
-	) => void;
+	const callback =
+		handler ??
+		((context.controller as any)[parameters.callback] as (
+			event: Event,
+		) => void);
 
 	if (typeof callback !== 'function') {
 		return;
@@ -93,6 +98,28 @@ function handleData(context: Context, name: string, value: string): void {
 	context.data.value[name] = data;
 }
 
+function handleInput(
+	context: Context,
+	element: Element,
+	action: string,
+	added: boolean,
+): void {
+	if (element instanceof HTMLInputElement) {
+		handleAction(context, element, 'input', added, function () {
+			context.data.value[action] = element.value;
+		});
+	}
+}
+
+function handleOutput(
+	context: Context,
+	element: Element,
+	output: string,
+	added: boolean,
+): void {
+	handleTarget(context, element, `output:${output}`, added);
+}
+
 function handleTarget(
 	context: Context,
 	element: Element,
@@ -113,15 +140,24 @@ export function observeController(
 	const {
 		action: actionAttribute,
 		data: dataAttribute,
+		input: inputAttribute,
+		output: outputAttribute,
 		target: targetAttribute,
 	} = attributes;
 
 	const callbacks = {
 		[actionAttribute]: handleAction,
+		[inputAttribute]: handleInput,
+		[outputAttribute]: handleOutput,
 		[targetAttribute]: handleTarget,
 	};
 
-	const names = [actionAttribute, targetAttribute];
+	const names = [
+		actionAttribute,
+		inputAttribute,
+		outputAttribute,
+		targetAttribute,
+	];
 
 	return createObserver(
 		context.element,

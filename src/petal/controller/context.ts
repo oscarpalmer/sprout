@@ -50,6 +50,8 @@ export function createContext(
 			value: observeController(context, {
 				action: `data-${name}-action`,
 				data: `data-${name}-data-`,
+				input: `data-${name}-input`,
+				output: `data-${name}-output`,
 				target: `data-${name}-target`,
 			}),
 		},
