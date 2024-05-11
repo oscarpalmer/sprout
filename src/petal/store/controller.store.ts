@@ -33,22 +33,15 @@ export function createController(
 
 export function removeController(name: string, element: Element): void {
 	const stored = controllers.get(name);
+	const instance = stored?.instances.get(element);
 
-	if (stored == null) {
-		return;
+	if (instance != null) {
+		stored?.instances.delete(element);
+
+		instance.actions.clear();
+		instance.observer.stop();
+		instance.targets.clear();
+
+		instance.controller.disconnected?.();
 	}
-
-	const instance = stored.instances.get(element);
-
-	if (instance == null) {
-		return;
-	}
-
-	stored.instances.delete(element);
-
-	instance.actions.clear();
-	instance.observer.stop();
-	instance.targets.clear();
-
-	instance.controller.disconnected?.();
 }

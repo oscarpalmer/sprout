@@ -28,13 +28,11 @@ export function createActions() {
 		add(name, element) {
 			const action = store.get(name);
 
-			if (action == null) {
-				return;
+			if (action != null) {
+				action.targets.add(element);
+
+				element.addEventListener(action.type, action.callback, action.options);
 			}
-
-			action.targets.add(element);
-
-			element.addEventListener(action.type, action.callback, action.options);
 		},
 		clear() {
 			for (const [, action] of store) {
@@ -67,16 +65,14 @@ export function createActions() {
 		remove(name, element) {
 			const action = store.get(name);
 
-			if (action == null) {
-				return;
-			}
+			if (action != null) {
+				element.removeEventListener(action.type, action.callback);
 
-			element.removeEventListener(action.type, action.callback);
+				action.targets.delete(element);
 
-			action.targets.delete(element);
-
-			if (action.targets.size === 0) {
-				store.delete(name);
+				if (action.targets.size === 0) {
+					store.delete(name);
+				}
 			}
 		},
 	} as Actions);

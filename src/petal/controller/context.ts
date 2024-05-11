@@ -1,3 +1,4 @@
+import {handleExternalAttributes} from '../observer/attributes';
 import {observeController} from '../observer/controller.observer';
 import type {Observer} from '../observer/observer';
 import {createActions, type Actions} from '../store/action.store';
@@ -56,6 +57,8 @@ export function createContext(
 			}),
 		},
 	});
+
+	handleExternalAttributes(context);
 
 	controller.connected?.();
 

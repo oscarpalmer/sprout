@@ -17,22 +17,36 @@ class Controller {
   }
 }
 
+// node_modules/@oscarpalmer/atoms/dist/js/string.mjs
+var getString = function(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value !== "object" || value == null) {
+    return String(value);
+  }
+  const valueOff = value.valueOf?.() ?? value;
+  const asString = valueOff?.toString?.() ?? String(valueOff);
+  return asString.startsWith("[object ") ? JSON.stringify(value) : asString;
+};
+
+// node_modules/@oscarpalmer/atoms/dist/js/is.mjs
+var isNullableOrWhitespace = function(value) {
+  return value == null || /^\s*$/.test(getString(value));
+};
+
 // src/petal/helpers/event.ts
 function getEventParameters(element, action) {
   const matches = action.match(pattern);
-  if (matches == null) {
-    return;
+  if (matches != null) {
+    const [, type, callback, options] = matches;
+    const parameters = {
+      callback,
+      options: getOptions(options ?? ""),
+      type: type ?? getType(element)
+    };
+    return parameters.type == null ? undefined : parameters;
   }
-  const [, type, callback, options] = matches;
-  const parameters = {
-    callback,
-    options: getOptions(options ?? ""),
-    type: type ?? getType(element)
-  };
-  if (parameters.type == null) {
-    return;
-  }
-  return parameters;
 }
 var getOptions = function(options) {
   const items = options.toLowerCase().split(":");
@@ -59,24 +73,7 @@ var defaultEvents = {
 var pattern = /^(?:(\w+)@)?(\w+)(?::([a-z:]+))?$/i;
 
 // src/petal/observer/observer.ts
-function getAttributes(from, to) {
-  const fromValues = from.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
-  const toValues = to.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
-  const attributes = [[], []];
-  for (let outer = 0;outer < 2; outer += 1) {
-    const values = outer === 0 ? fromValues : toValues;
-    const other = outer === 1 ? fromValues : toValues;
-    const { length } = values;
-    for (let inner = 0;inner < length; inner += 1) {
-      const value = values[inner];
-      if (!other.includes(value)) {
-        attributes[outer].push(value);
-      }
-    }
-  }
-  return attributes;
-}
-function createObserver(element, options, handlers) {
+function createObserver(element, options, attributeHandler) {
   let frame;
   const observer = new MutationObserver((entries) => {
     for (const entry of entries) {
@@ -84,12 +81,17 @@ function createObserver(element, options, handlers) {
         instance.handleNodes(entry.addedNodes, true);
         instance.handleNodes(entry.removedNodes, false);
       } else if (entry.type === "attributes" && entry.target instanceof Element) {
-        instance.handleAttribute(entry.target, entry.attributeName ?? "", entry.oldValue ?? "", false);
+        attributeHandler(entry.target, entry.attributeName ?? "", entry.oldValue ?? "", true);
       }
     }
   });
   const instance = Object.create({
-    ...handlers,
+    handleElement(element2, added) {
+      const attributes = Array.from(element2.attributes);
+      for (const attribute2 of attributes) {
+        attributeHandler(element2, attribute2.name, "", added);
+      }
+    },
     handleNodes(nodes, added) {
       for (const node of nodes) {
         if (node instanceof Element) {
@@ -112,7 +114,13 @@ function createObserver(element, options, handlers) {
       });
     }
   });
-  instance.start();
+  if (element.ownerDocument.readyState === "complete") {
+    instance.start();
+  } else {
+    element.ownerDocument.addEventListener("DOMContentLoaded", () => {
+      instance.start();
+    });
+  }
   return instance;
 }
 var options = {
@@ -123,116 +131,35 @@ var options = {
 };
 
 // src/petal/observer/controller.observer.ts
-var handleAction = function(context, element, action, added, handler) {
-  if (context.actions.has(action)) {
-    if (added) {
-      context.actions.add(action, element);
-    } else {
-      context.actions.remove(action, element);
-    }
-    return;
-  }
-  if (!added) {
-    return;
-  }
-  const parameters = getEventParameters(element, action);
-  if (parameters == null) {
-    return;
-  }
-  const callback = handler ?? context.controller[parameters.callback];
-  if (typeof callback !== "function") {
-    return;
-  }
-  context.actions.create({
-    callback: callback.bind(context.controller),
-    name: action,
-    options: parameters.options,
-    target: element,
-    type: parameters.type
-  });
-  context.actions.add(action, element);
-};
-var handleChanges = function(context, element, oldValue, newValue, callback) {
-  const attributes = getAttributes(oldValue, newValue);
-  for (const names of attributes) {
-    const added = attributes.indexOf(names) === 1;
-    for (const name of names) {
-      callback(context, element, name, added);
-    }
-  }
-};
-var handleData = function(context, name, value) {
-  let data;
-  try {
-    data = JSON.parse(value);
-  } catch (_) {
-    data = value;
-  }
-  context.data.value[name] = data;
-};
-var handleInput = function(context, element, action, added) {
-  if (element instanceof HTMLInputElement) {
-    handleAction(context, element, "input", added, function() {
-      context.data.value[action] = element.value;
-    });
-  }
-};
-var handleOutput = function(context, element, output, added) {
-  handleTarget(context, element, `output:${output}`, added);
-};
-var handleTarget = function(context, element, target, added) {
-  if (added) {
-    context.targets.add(target, element);
-  } else {
-    context.targets.remove(target, element);
-  }
-};
-function observeController(context, attributes) {
+function observeController(context, attributes2) {
   const {
     action: actionAttribute,
     data: dataAttribute,
     input: inputAttribute,
     output: outputAttribute,
     target: targetAttribute
-  } = attributes;
+  } = attributes2;
   const callbacks = {
-    [actionAttribute]: handleAction,
-    [inputAttribute]: handleInput,
-    [outputAttribute]: handleOutput,
-    [targetAttribute]: handleTarget
+    [actionAttribute]: handleActionAttribute,
+    [inputAttribute]: handleInputAttribute,
+    [outputAttribute]: handleOutputAttribute,
+    [targetAttribute]: handleTargetAttribute
   };
-  const names = [
-    actionAttribute,
-    inputAttribute,
-    outputAttribute,
-    targetAttribute
-  ];
+  const { length } = dataAttribute;
   return createObserver(context.element, {
     ...options
-  }, {
-    handleAttribute(element, name, value, removed) {
-      let oldValue = value;
-      let newValue = element.getAttribute(name) ?? "";
-      if (newValue === oldValue) {
-        return;
-      }
-      if (removed) {
-        oldValue = newValue;
-        newValue = "";
-      }
-      if (names.includes(name)) {
-        handleChanges(context, element, oldValue, newValue, callbacks[name]);
-      } else if (name.startsWith(dataAttribute)) {
-        handleData(context, name.slice(dataAttribute.length), newValue);
-      }
-    },
-    handleElement(element, added) {
-      const attributes2 = Array.from(element.attributes);
-      const { length } = attributes2;
-      let index = 0;
-      for (;index < length; index += 1) {
-        this.handleAttribute(element, attributes2[index].name, "", !added);
-      }
+  }, (element, name, value, added) => {
+    if (name.startsWith(dataAttribute)) {
+      handleDataAttribute(context, name.slice(length), element.getAttribute(name) ?? "");
+    } else {
+      handleAttributeChanges({
+        added,
+        callbacks,
+        context,
+        element,
+        name,
+        value
+      });
     }
   });
 }
@@ -243,11 +170,10 @@ function createActions() {
   return Object.create({
     add(name, element) {
       const action = store.get(name);
-      if (action == null) {
-        return;
+      if (action != null) {
+        action.targets.add(element);
+        element.addEventListener(action.type, action.callback, action.options);
       }
-      action.targets.add(element);
-      element.addEventListener(action.type, action.callback, action.options);
     },
     clear() {
       for (const [, action] of store) {
@@ -273,35 +199,16 @@ function createActions() {
     },
     remove(name, element) {
       const action = store.get(name);
-      if (action == null) {
-        return;
-      }
-      element.removeEventListener(action.type, action.callback);
-      action.targets.delete(element);
-      if (action.targets.size === 0) {
-        store.delete(name);
+      if (action != null) {
+        element.removeEventListener(action.type, action.callback);
+        action.targets.delete(element);
+        if (action.targets.size === 0) {
+          store.delete(name);
+        }
       }
     }
   });
 }
-
-// node_modules/@oscarpalmer/atoms/dist/js/string.mjs
-var getString = function(value) {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value !== "object" || value == null) {
-    return String(value);
-  }
-  const valueOff = value.valueOf?.() ?? value;
-  const asString = valueOff?.toString?.() ?? String(valueOff);
-  return asString.startsWith("[object ") ? JSON.stringify(value) : asString;
-};
-
-// node_modules/@oscarpalmer/atoms/dist/js/is.mjs
-var isNullableOrWhitespace = function(value) {
-  return value == null || /^\s*$/.test(getString(value));
-};
 
 // src/petal/store/data.store.ts
 var setValue = function(context, prefix, name, original, stringified) {
@@ -310,6 +217,12 @@ var setValue = function(context, prefix, name, original, stringified) {
     element.removeAttribute(`${prefix}${name}`);
   } else {
     element.setAttribute(`${prefix}${name}`, stringified);
+  }
+  const inputs = context.targets.get(`input:${name}`);
+  for (const input of inputs) {
+    if (input instanceof HTMLInputElement && input.value !== stringified) {
+      input.value = stringified;
+    }
   }
   const outputs = context.targets.get(`output:${name}`);
   for (const output of outputs) {
@@ -406,6 +319,7 @@ function createContext(name, element, ctor) {
       })
     }
   });
+  handleExternalAttributes(context);
   controller2.connected?.();
   return context;
 }
@@ -427,57 +341,190 @@ function createController(name, ctor) {
 }
 function removeController(name, element) {
   const stored = controllers.get(name);
-  if (stored == null) {
-    return;
+  const instance = stored?.instances.get(element);
+  if (instance != null) {
+    stored?.instances.delete(element);
+    instance.actions.clear();
+    instance.observer.stop();
+    instance.targets.clear();
+    instance.controller.disconnected?.();
   }
-  const instance = stored.instances.get(element);
-  if (instance == null) {
-    return;
-  }
-  stored.instances.delete(element);
-  instance.actions.clear();
-  instance.observer.stop();
-  instance.targets.clear();
-  instance.controller.disconnected?.();
 }
 var controllers = new Map;
 
-// src/petal/observer/document.observer.ts
-var handleChanges2 = function(element, newValue, oldValue) {
-  const attributes = getAttributes(oldValue, newValue);
-  for (const names of attributes) {
-    const added = attributes.indexOf(names) === 1;
-    for (const name of names) {
-      if (added) {
-        addController(name, element);
-      } else {
-        removeController(name, element);
+// src/petal/observer/attributes.ts
+var getChanges = function(from, to) {
+  const fromValues = from.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
+  const toValues = to.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
+  const attributes3 = [[], []];
+  for (let outer = 0;outer < 2; outer += 1) {
+    const values = outer === 0 ? fromValues : toValues;
+    const other = outer === 1 ? fromValues : toValues;
+    const { length } = values;
+    for (let inner = 0;inner < length; inner += 1) {
+      const value = values[inner];
+      if (!other.includes(value)) {
+        attributes3[outer].push(value);
       }
     }
   }
+  return attributes3;
 };
-function observeDocument() {
-  return createObserver(document.body, {
-    ...options,
-    attributeFilter: [attribute]
-  }, {
-    handleAttribute(element, name, value, removed) {
-      let oldValue = value;
-      let newValue = element.getAttribute(name) ?? "";
-      if (newValue === oldValue) {
-        return;
-      }
-      if (removed) {
-        oldValue = newValue;
-        newValue = "";
-      }
-      handleChanges2(element, newValue, oldValue);
-    },
-    handleElement(element, added) {
-      if (element.hasAttribute(attribute)) {
-        this.handleAttribute(element, attribute, "", !added);
+function handleActionAttribute(element, _, value, added, context2, handler) {
+  if (context2 == null) {
+    return;
+  }
+  if (context2.actions.has(value)) {
+    if (added) {
+      context2.actions.add(value, element);
+    } else {
+      context2.actions.remove(value, element);
+    }
+    return;
+  }
+  if (!added) {
+    return;
+  }
+  const parameters = getEventParameters(element, value);
+  if (parameters == null) {
+    return;
+  }
+  const callback = handler ?? context2.controller[parameters.callback];
+  if (typeof callback === "function") {
+    context2.actions.create({
+      callback: callback.bind(context2.controller),
+      name: value,
+      options: parameters.options,
+      target: element,
+      type: parameters.type
+    });
+    context2.actions.add(value, element);
+  }
+}
+function handleAttributeChanges(parameters) {
+  const callback = parameters.callbacks[parameters.name];
+  if (callback == null) {
+    return;
+  }
+  let from = parameters.value;
+  let to = parameters.element.getAttribute(parameters.name) ?? "";
+  if (from === to) {
+    return;
+  }
+  if (!parameters.added) {
+    [from, to] = [to, from];
+  }
+  handleChanges({
+    callback,
+    from,
+    to,
+    context: parameters.context,
+    element: parameters.element,
+    name: parameters.name
+  });
+}
+var handleChanges = function(parameters) {
+  const changes = getChanges(parameters.from, parameters.to);
+  for (const changed of changes) {
+    const added = changes.indexOf(changed) === 1;
+    for (const change of changed) {
+      parameters.callback(parameters.element, parameters.name, change, added, parameters.context);
+    }
+  }
+};
+function handleControllerAttribute(element, _, value, added) {
+  if (added) {
+    addController(value, element);
+  } else {
+    removeController(value, element);
+  }
+}
+function handleDataAttribute(context2, name, value) {
+  let data2;
+  try {
+    data2 = JSON.parse(value);
+  } catch (_) {
+    data2 = value;
+  }
+  context2.data.value[name] = data2;
+}
+function handleExternalAttributes(context2) {
+  if (isNullableOrWhitespace(context2.element.id)) {
+    return;
+  }
+  const prefix = `${context2.element.id}->${context2.identifier}.`;
+  const inputs = document.querySelectorAll(`[data-petal-input^="${prefix}"]`);
+  const outputs = document.querySelectorAll(`[data-petal-output^="${prefix}"]`);
+  const matrix = [inputs, outputs];
+  for (const elements of matrix) {
+    const index = matrix.indexOf(elements);
+    const attribute2 = index === 0 ? "data-petal-input" : "data-petal-output";
+    const callback = index === 0 ? handleInputAttribute : handleOutputAttribute;
+    for (const element of elements) {
+      const [, , , name] = /^(\w+)->(\w+)\.(\w+)$/.exec(element.getAttribute(attribute2) ?? "") ?? [];
+      if (name != null) {
+        callback(element, "", name, true, context2);
       }
     }
+  }
+}
+function handleExternalInputAttribute(element, _, value, added) {
+  handleExternalTargetAttribute(element, value, true, added);
+}
+function handleExternalOutputAttribute(element, _, value, added) {
+  handleExternalTargetAttribute(element, value, false, added);
+}
+var handleExternalTargetAttribute = function(element, value, input, added) {
+  const [, identifier, controller3, name] = /^(\w+)->(\w+)\.(\w+)$/.exec(value) ?? [];
+  if (identifier == null || controller3 == null || name == null) {
+    return;
+  }
+  const identified = document.querySelector(`#${identifier}`);
+  const context2 = identified && controllers.get(controller3)?.instances.get(element);
+  if (context2 != null) {
+    (input ? handleInputAttribute : handleOutputAttribute)(element, "", name, added, context2);
+  }
+};
+function handleInputAttribute(element, _, value, added, context2) {
+  if (context2 != null && element instanceof HTMLInputElement) {
+    handleActionAttribute(element, "", "input", added, context2, (event2) => {
+      context2.data.value[value] = event2.target.value;
+    });
+    handleTargetAttribute(element, "", `input:${value}`, added, context2);
+  }
+}
+function handleOutputAttribute(element, _, value, added, context2) {
+  handleTargetAttribute(element, "", `output:${value}`, added, context2);
+}
+function handleTargetAttribute(element, _, value, added, context2) {
+  if (added) {
+    context2?.targets.add(value, element);
+  } else {
+    context2?.targets.remove(value, element);
+  }
+}
+
+// src/petal/observer/document.observer.ts
+function observeDocument() {
+  const inputAttribute = `${attribute}-input`;
+  const outputAttribute = `${attribute}-output`;
+  const attributes4 = [attribute, inputAttribute, outputAttribute];
+  const callbacks = {
+    [attribute]: handleControllerAttribute,
+    [inputAttribute]: handleExternalInputAttribute,
+    [outputAttribute]: handleExternalOutputAttribute
+  };
+  return createObserver(document.body, {
+    ...options,
+    attributeFilter: attributes4
+  }, (element, name, value, added) => {
+    handleAttributeChanges({
+      added,
+      callbacks,
+      element,
+      name,
+      value
+    });
   });
 }
 

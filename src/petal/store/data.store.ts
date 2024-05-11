@@ -22,6 +22,14 @@ function setValue(
 		element.setAttribute(`${prefix}${name}`, stringified);
 	}
 
+	const inputs = context.targets.get(`input:${name}`);
+
+	for (const input of inputs) {
+		if (input instanceof HTMLInputElement && input.value !== stringified) {
+			input.value = stringified;
+		}
+	}
+
 	const outputs = context.targets.get(`output:${name}`);
 
 	for (const output of outputs) {

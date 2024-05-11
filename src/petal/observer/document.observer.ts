@@ -1,60 +1,38 @@
 import {attribute} from '../controller/controller';
-import {addController, removeController} from '../store/controller.store';
 import {
-	type Observer,
-	createObserver,
-	getAttributes,
-	options,
-} from './observer';
-
-function handleChanges(
-	element: Element,
-	newValue: string,
-	oldValue: string,
-): void {
-	const attributes = getAttributes(oldValue, newValue);
-
-	for (const names of attributes) {
-		const added = attributes.indexOf(names) === 1;
-
-		for (const name of names) {
-			if (added) {
-				addController(name, element);
-			} else {
-				removeController(name, element);
-			}
-		}
-	}
-}
+	handleAttributeChanges,
+	handleControllerAttribute,
+	handleExternalInputAttribute,
+	handleExternalOutputAttribute,
+} from './attributes';
+import {type Observer, createObserver, options} from './observer';
 
 export function observeDocument(): Observer {
+	const inputAttribute = `${attribute}-input`;
+	const outputAttribute = `${attribute}-output`;
+
+	const attributes = [attribute, inputAttribute, outputAttribute];
+
+	const callbacks = {
+		[attribute]: handleControllerAttribute,
+		[inputAttribute]: handleExternalInputAttribute,
+		[outputAttribute]: handleExternalOutputAttribute,
+	};
+
 	return createObserver(
 		document.body,
 		{
 			...options,
-			attributeFilter: [attribute],
+			attributeFilter: attributes,
 		},
-		{
-			handleAttribute(element, name, value, removed) {
-				let oldValue = value;
-				let newValue = element.getAttribute(name) ?? '';
-
-				if (newValue === oldValue) {
-					return;
-				}
-
-				if (removed) {
-					oldValue = newValue;
-					newValue = '';
-				}
-
-				handleChanges(element, newValue, oldValue);
-			},
-			handleElement(element, added) {
-				if (element.hasAttribute(attribute)) {
-					this.handleAttribute(element, attribute, '', !added);
-				}
-			},
+		(element, name, value, added) => {
+			handleAttributeChanges({
+				added,
+				callbacks,
+				element,
+				name,
+				value,
+			});
 		},
 	);
 }

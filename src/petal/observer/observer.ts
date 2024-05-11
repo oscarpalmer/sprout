@@ -1,19 +1,10 @@
-type Handlers = {
-	handleAttribute(
-		element: Element,
-		name: string,
-		value: string,
-		removed: boolean,
-	): void;
-	handleElement(element: Element, added: boolean): void;
-};
-
 export type Observer = {
+	handleElement(element: Element, added: boolean): void;
 	handleNodes(nodes: NodeList | Node[], added: boolean): void;
 	start(): void;
 	stop(): void;
 	update(): void;
-} & Handlers;
+};
 
 export const options: MutationObserverInit = {
 	attributeOldValue: true,
@@ -22,41 +13,15 @@ export const options: MutationObserverInit = {
 	subtree: true,
 };
 
-export function getAttributes(from: string, to: string): string[][] {
-	const fromValues = from
-		.split(/\s+/)
-		.map(part => part.trim())
-		.filter(part => part.length > 0);
-
-	const toValues = to
-		.split(/\s+/)
-		.map(part => part.trim())
-		.filter(part => part.length > 0);
-
-	const attributes: string[][] = [[], []];
-
-	for (let outer = 0; outer < 2; outer += 1) {
-		const values = outer === 0 ? fromValues : toValues;
-		const other = outer === 1 ? fromValues : toValues;
-
-		const {length} = values;
-
-		for (let inner = 0; inner < length; inner += 1) {
-			const value = values[inner];
-
-			if (!other.includes(value)) {
-				attributes[outer].push(value);
-			}
-		}
-	}
-
-	return attributes;
-}
-
 export function createObserver(
 	element: Element,
 	options: MutationObserverInit,
-	handlers: Handlers,
+	attributeHandler: (
+		element: Element,
+		name: string,
+		value: string,
+		added: boolean,
+	) => void,
 ): Observer {
 	let frame: number;
 
@@ -69,18 +34,24 @@ export function createObserver(
 				entry.type === 'attributes' &&
 				entry.target instanceof Element
 			) {
-				instance.handleAttribute(
+				attributeHandler(
 					entry.target,
 					entry.attributeName ?? '',
 					entry.oldValue ?? '',
-					false,
+					true,
 				);
 			}
 		}
 	});
 
 	const instance: Observer = Object.create({
-		...handlers,
+		handleElement(element: Element, added: boolean) {
+			const attributes = Array.from(element.attributes);
+
+			for (const attribute of attributes) {
+				attributeHandler(element, attribute.name, '', added);
+			}
+		},
 		handleNodes(nodes, added) {
 			for (const node of nodes) {
 				if (node instanceof Element) {
@@ -106,7 +77,13 @@ export function createObserver(
 		},
 	} as Observer);
 
-	instance.start();
+	if (element.ownerDocument.readyState === 'complete') {
+		instance.start();
+	} else {
+		element.ownerDocument.addEventListener('DOMContentLoaded', () => {
+			instance.start();
+		});
+	}
 
 	return instance;
 }

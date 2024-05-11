@@ -18,23 +18,17 @@ const pattern = /^(?:(\w+)@)?(\w+)(?::([a-z:]+))?$/i;
 export function getEventParameters(element: Element, action: string) {
 	const matches = action.match(pattern);
 
-	if (matches == null) {
-		return;
+	if (matches != null) {
+		const [, type, callback, options] = matches;
+
+		const parameters: EventParameters = {
+			callback,
+			options: getOptions(options ?? ''),
+			type: type ?? getType(element),
+		};
+
+		return parameters.type == null ? undefined : parameters;
 	}
-
-	const [, type, callback, options] = matches;
-
-	const parameters: EventParameters = {
-		callback,
-		options: getOptions(options ?? ''),
-		type: type ?? getType(element),
-	};
-
-	if (parameters.type == null) {
-		return;
-	}
-
-	return parameters;
 }
 
 function getOptions(options: string): AddEventListenerOptions {

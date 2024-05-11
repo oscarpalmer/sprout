@@ -1,0 +1,21 @@
+import type { Context } from '../controller/context';
+type HandleAttributeCallback = (element: Element, name: string, value: string, added: boolean, context?: Context, handler?: (event: Event) => void) => void;
+type HandleAttributeParameters = {
+    added: boolean;
+    callbacks: Record<string, HandleAttributeCallback>;
+    context?: Context;
+    element: Element;
+    name: string;
+    value: string;
+};
+export declare function handleActionAttribute(element: Element, _: string, value: string, added: boolean, context?: Context, handler?: (event: Event) => void): void;
+export declare function handleAttributeChanges(parameters: HandleAttributeParameters): void;
+export declare function handleControllerAttribute(element: Element, _: string, value: string, added: boolean): void;
+export declare function handleDataAttribute(context: Context, name: string, value: string): void;
+export declare function handleExternalAttributes(context: Context): void;
+export declare function handleExternalInputAttribute(element: Element, _: string, value: string, added: boolean): void;
+export declare function handleExternalOutputAttribute(element: Element, _: string, value: string, added: boolean): void;
+export declare function handleInputAttribute(element: Element, _: string, value: string, added: boolean, context?: Context): void;
+export declare function handleOutputAttribute(element: Element, _: string, value: string, added: boolean, context?: Context): void;
+export declare function handleTargetAttribute(element: Element, _: string, value: string, added: boolean, context?: Context): void;
+export {};
