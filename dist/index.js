@@ -413,24 +413,6 @@ class Controller {
   }
 }
 
-// node_modules/@oscarpalmer/atoms/dist/js/string.mjs
-var getString2 = function(value9) {
-  if (typeof value9 === "string") {
-    return value9;
-  }
-  if (typeof value9 !== "object" || value9 == null) {
-    return String(value9);
-  }
-  const valueOff = value9.valueOf?.() ?? value9;
-  const asString = valueOff?.toString?.() ?? String(valueOff);
-  return asString.startsWith("[object ") ? JSON.stringify(value9) : asString;
-};
-
-// node_modules/@oscarpalmer/atoms/dist/js/is.mjs
-var isNullableOrWhitespace = function(value9) {
-  return value9 == null || /^\s*$/.test(getString2(value9));
-};
-
 // src/petal/helpers/event.ts
 function getEventParameters(element, action) {
   const matches = action.match(pattern);
@@ -527,35 +509,14 @@ var options = {
 };
 
 // src/petal/observer/controller.observer.ts
-function observeController(context, attributes2) {
-  const {
-    action: actionAttribute,
-    data: dataAttribute,
-    input: inputAttribute,
-    output: outputAttribute,
-    target: targetAttribute
-  } = attributes2;
-  const callbacks = {
-    [actionAttribute]: handleActionAttribute,
-    [inputAttribute]: handleInputAttribute,
-    [outputAttribute]: handleOutputAttribute,
-    [targetAttribute]: handleTargetAttribute
-  };
-  const { length } = dataAttribute;
+function observeController(context) {
+  const prefix = `data-${context.identifier}-`;
+  const { length } = prefix;
   return createObserver(context.element, {
     ...options
-  }, (element, name, value9, added) => {
-    if (name.startsWith(dataAttribute)) {
+  }, (element, name) => {
+    if (name.startsWith(prefix)) {
       handleDataAttribute(context, name.slice(length), element.getAttribute(name) ?? "");
-    } else {
-      handleAttributeChanges({
-        added,
-        callbacks,
-        context,
-        element,
-        name,
-        value: value9
-      });
     }
   });
 }
@@ -606,6 +567,24 @@ function createActions() {
   });
 }
 
+// node_modules/@oscarpalmer/atoms/dist/js/string.mjs
+var getString2 = function(value9) {
+  if (typeof value9 === "string") {
+    return value9;
+  }
+  if (typeof value9 !== "object" || value9 == null) {
+    return String(value9);
+  }
+  const valueOff = value9.valueOf?.() ?? value9;
+  const asString = valueOff?.toString?.() ?? String(valueOff);
+  return asString.startsWith("[object ") ? JSON.stringify(value9) : asString;
+};
+
+// node_modules/@oscarpalmer/atoms/dist/js/is.mjs
+var isNullableOrWhitespace = function(value9) {
+  return value9 == null || /^\s*$/.test(getString2(value9));
+};
+
 // src/petal/store/data.store.ts
 var setValue3 = function(context, prefix, name, original, stringified) {
   const { element } = context;
@@ -616,7 +595,7 @@ var setValue3 = function(context, prefix, name, original, stringified) {
   }
   const inputs = context.targets.get(`input:${name}`);
   for (const input of inputs) {
-    if (input instanceof HTMLInputElement && input.value !== stringified) {
+    if ((input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) && input.value !== stringified) {
       input.value = stringified;
     }
   }
@@ -627,7 +606,7 @@ var setValue3 = function(context, prefix, name, original, stringified) {
 };
 function createData(identifier, context) {
   const frames = {};
-  const prefix = `data-${identifier}-data-`;
+  const prefix = `data-${identifier}-`;
   const instance = Object.create(null);
   Object.defineProperty(instance, "value", {
     value: new Proxy({}, {
@@ -706,16 +685,10 @@ function createContext(name, element, ctor) {
       value: controller2
     },
     observer: {
-      value: observeController(context, {
-        action: `data-${name}-action`,
-        data: `data-${name}-data-`,
-        input: `data-${name}-input`,
-        output: `data-${name}-output`,
-        target: `data-${name}-target`
-      })
+      value: observeController(context)
     }
   });
-  handleExternalAttributes(context);
+  handleAttributes(context);
   controller2.connected?.();
   return context;
 }
@@ -766,10 +739,7 @@ var getChanges = function(from, to) {
   }
   return attributes3;
 };
-function handleActionAttribute(element, _, value9, added, context2, handler) {
-  if (context2 == null) {
-    return;
-  }
+var handleAction = function(context2, element, _, value9, added, handler) {
   if (context2.actions.has(value9)) {
     if (added) {
       context2.actions.add(value9, element);
@@ -796,6 +766,9 @@ function handleActionAttribute(element, _, value9, added, context2, handler) {
     });
     context2.actions.add(value9, element);
   }
+};
+function handleActionAttribute(element, _, value9, added) {
+  handleTarget(element, value9, added, actionPattern, handleAction);
 }
 function handleAttributeChanges(parameters) {
   const callback = parameters.callbacks[parameters.name];
@@ -814,7 +787,6 @@ function handleAttributeChanges(parameters) {
     callback,
     from,
     to,
-    context: parameters.context,
     element: parameters.element,
     name: parameters.name
   });
@@ -824,7 +796,7 @@ var handleChanges = function(parameters) {
   for (const changed of changes) {
     const added = changes.indexOf(changed) === 1;
     for (const change of changed) {
-      parameters.callback(parameters.element, parameters.name, change, added, parameters.context);
+      parameters.callback(parameters.element, parameters.name, change, added);
     }
   }
 };
@@ -844,71 +816,102 @@ function handleDataAttribute(context2, name, value9) {
   }
   context2.data.value[name] = data2;
 }
-function handleExternalAttributes(context2) {
-  if (isNullableOrWhitespace(context2.element.id)) {
-    return;
-  }
-  const prefix = `${context2.element.id}->${context2.identifier}.`;
-  const inputs = document.querySelectorAll(`[data-petal-input^="${prefix}"]`);
-  const outputs = document.querySelectorAll(`[data-petal-output^="${prefix}"]`);
-  const matrix = [inputs, outputs];
-  for (const elements of matrix) {
-    const index = matrix.indexOf(elements);
-    const attribute3 = index === 0 ? "data-petal-input" : "data-petal-output";
-    const callback = index === 0 ? handleInputAttribute : handleOutputAttribute;
-    for (const element of elements) {
-      const [, , , name] = /^(\w+)->(\w+)\.(\w+)$/.exec(element.getAttribute(attribute3) ?? "") ?? [];
-      if (name != null) {
-        callback(element, "", name, true, context2);
+function handleAttributes(context2) {
+  const attributes3 = ["action", "input", "output", "target"];
+  const callbacks = [
+    handleActionAttribute,
+    handleInputAttribute,
+    handleOutputAttribute,
+    handleTargetAttribute
+  ];
+  const values = [`->${context2.identifier}@`, `->${context2.identifier}.`];
+  for (const attribute3 of attributes3) {
+    const index = attributes3.indexOf(attribute3);
+    const callback = callbacks[index];
+    const value9 = index === 0 ? values[0] : values[1];
+    const targets = document.querySelectorAll(`[data-${attribute3}*="${value9}"]`);
+    if (targets.length === 0) {
+      continue;
+    }
+    for (const target2 of targets) {
+      const attributes4 = Array.from(target2.attributes);
+      for (const attribute4 of attributes4) {
+        if (attribute4.value.includes(value9)) {
+          callback(target2, "", attribute4.value, true);
+        }
       }
     }
   }
 }
-function handleExternalInputAttribute(element, _, value9, added) {
-  handleExternalTargetAttribute(element, value9, true, added);
+function handleInputAttribute(element, _, value9, added) {
+  handleTarget(element, value9, added, targetPattern, handleInput);
 }
-function handleExternalOutputAttribute(element, _, value9, added) {
-  handleExternalTargetAttribute(element, value9, false, added);
+function handleOutputAttribute(element, _, value9, added) {
+  handleTarget(element, value9, added, targetPattern, handleOutput);
 }
-var handleExternalTargetAttribute = function(element, value9, input, added) {
-  const [, identifier, controller3, name] = /^(\w+)->(\w+)\.(\w+)$/.exec(value9) ?? [];
-  if (identifier == null || controller3 == null || name == null) {
+var handleTarget = function(element, value9, added, pattern2, callback) {
+  const [, identifier, controller3, name] = pattern2.exec(value9) ?? [];
+  if (controller3 == null || name == null) {
     return;
   }
-  const identified = document.querySelector(`#${identifier}`);
-  const context2 = identified && controllers.get(controller3)?.instances.get(element);
+  let identified;
+  if (identifier == null) {
+    identified = element.closest(`[data-petal*="${controller3}"]`);
+  } else {
+    identified = document.querySelector(`#${identifier}`);
+  }
+  if (identified == null) {
+    return;
+  }
+  const context2 = controllers.get(controller3)?.instances.get(identified);
   if (context2 != null) {
-    (input ? handleInputAttribute : handleOutputAttribute)(element, "", name, added, context2);
+    callback(context2, element, "", name, added);
   }
 };
-function handleInputAttribute(element, _, value9, added, context2) {
-  if (context2 != null && element instanceof HTMLInputElement) {
-    handleActionAttribute(element, "", "input", added, context2, (event6) => {
-      context2.data.value[value9] = event6.target.value;
+function handleTargetAttribute(element, _, value9, added) {
+  handleTarget(element, value9, added, targetPattern, handleTargetElement);
+}
+var handleInput = function(context2, element, _, value9, added) {
+  if (context2 != null && (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
+    const checkbox = element.getAttribute("type") === "checkbox";
+    handleAction(context2, element, "", "input", added, (event6) => {
+      context2.data.value[value9] = checkbox ? event6.target.checked : event6.target.value;
     });
-    handleTargetAttribute(element, "", `input:${value9}`, added, context2);
+    handleTargetElement(context2, element, "", `input:${value9}`, added);
   }
-}
-function handleOutputAttribute(element, _, value9, added, context2) {
-  handleTargetAttribute(element, "", `output:${value9}`, added, context2);
-}
-function handleTargetAttribute(element, _, value9, added, context2) {
+};
+var handleOutput = function(context2, element, _, value9, added) {
+  handleTargetElement(context2, element, "", `output:${value9}`, added);
+};
+var handleTargetElement = function(context2, element, _, value9, added) {
   if (added) {
-    context2?.targets.add(value9, element);
+    context2.targets.add(value9, element);
   } else {
-    context2?.targets.remove(value9, element);
+    context2.targets.remove(value9, element);
   }
-}
+};
+var actionPattern = /^(?:(\w+)->)?(\w+)@(\w+)$/;
+var targetPattern = /^(?:(\w+)->)?(\w+)?\.(\w+)$/;
 
 // src/petal/observer/document.observer.ts
 function observeDocument() {
-  const inputAttribute = `${attribute2}-input`;
-  const outputAttribute = `${attribute2}-output`;
-  const attributes4 = [attribute2, inputAttribute, outputAttribute];
+  const actionAttribute = "data-action";
+  const inputAttribute = "data-input";
+  const outputAttribute = "data-output";
+  const targetAttribute = "data-target";
+  const attributes4 = [
+    actionAttribute,
+    attribute2,
+    inputAttribute,
+    outputAttribute,
+    targetAttribute
+  ];
   const callbacks = {
+    [actionAttribute]: handleActionAttribute,
     [attribute2]: handleControllerAttribute,
-    [inputAttribute]: handleExternalInputAttribute,
-    [outputAttribute]: handleExternalOutputAttribute
+    [inputAttribute]: handleInputAttribute,
+    [outputAttribute]: handleOutputAttribute,
+    [targetAttribute]: handleTargetAttribute
   };
   return createObserver(document.body, {
     ...options,

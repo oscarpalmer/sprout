@@ -1,4 +1,3 @@
-import {isNullableOrWhitespace} from '@oscarpalmer/atoms/is';
 import type {PlainObject} from '@oscarpalmer/atoms/models';
 import type {Context} from '../controller/context';
 import {getEventParameters} from '../helpers/event';
@@ -8,32 +7,40 @@ import {
 	removeController,
 } from '../store/controller.store';
 
-type HandleAttributeCallback = (
+type ChangeCallback = (
 	element: Element,
 	name: string,
 	value: string,
 	added: boolean,
-	context?: Context,
+) => void;
+
+type HandleCallback = (
+	context: Context,
+	element: Element,
+	name: string,
+	value: string,
+	added: boolean,
 	handler?: (event: Event) => void,
 ) => void;
 
-type HandleAttributeParameters = {
+type HandleParameters = {
 	added: boolean;
-	callbacks: Record<string, HandleAttributeCallback>;
-	context?: Context;
+	callbacks: Record<string, ChangeCallback>;
 	element: Element;
 	name: string;
 	value: string;
 };
 
-type HandleChangesParameters = {
-	callback: HandleAttributeCallback;
-	context?: Context;
+type ChangesParameters = {
+	callback: ChangeCallback;
 	element: Element;
 	from: string;
 	name: string;
 	to: string;
 };
+
+const actionPattern = /^(?:(\w+)->)?(\w+)@(\w+)$/;
+const targetPattern = /^(?:(\w+)->)?(\w+)?\.(\w+)$/;
 
 function getChanges(from: string, to: string): string[][] {
 	const fromValues = from
@@ -66,18 +73,14 @@ function getChanges(from: string, to: string): string[][] {
 	return attributes;
 }
 
-export function handleActionAttribute(
+function handleAction(
+	context: Context,
 	element: Element,
 	_: string,
 	value: string,
 	added: boolean,
-	context?: Context,
 	handler?: (event: Event) => void,
 ): void {
-	if (context == null) {
-		return;
-	}
-
 	if (context.actions.has(value)) {
 		if (added) {
 			context.actions.add(value, element);
@@ -117,9 +120,16 @@ export function handleActionAttribute(
 	}
 }
 
-export function handleAttributeChanges(
-	parameters: HandleAttributeParameters,
+export function handleActionAttribute(
+	element: Element,
+	_: string,
+	value: string,
+	added: boolean,
 ): void {
+	handleTarget(element, value, added, actionPattern, handleAction);
+}
+
+export function handleAttributeChanges(parameters: HandleParameters): void {
 	const callback = parameters.callbacks[parameters.name];
 
 	if (callback == null) {
@@ -141,26 +151,19 @@ export function handleAttributeChanges(
 		callback,
 		from,
 		to,
-		context: parameters.context,
 		element: parameters.element,
 		name: parameters.name,
 	});
 }
 
-function handleChanges(parameters: HandleChangesParameters): void {
+function handleChanges(parameters: ChangesParameters): void {
 	const changes = getChanges(parameters.from, parameters.to);
 
 	for (const changed of changes) {
 		const added = changes.indexOf(changed) === 1;
 
 		for (const change of changed) {
-			parameters.callback(
-				parameters.element,
-				parameters.name,
-				change,
-				added,
-				parameters.context,
-			);
+			parameters.callback(parameters.element, parameters.name, change, added);
 		}
 	}
 }
@@ -194,79 +197,38 @@ export function handleDataAttribute(
 	context.data.value[name] = data;
 }
 
-export function handleExternalAttributes(context: Context): void {
-	if (isNullableOrWhitespace(context.element.id)) {
-		return;
-	}
+export function handleAttributes(context: Context): void {
+	const attributes = ['action', 'input', 'output', 'target'];
+	const callbacks = [
+		handleActionAttribute,
+		handleInputAttribute,
+		handleOutputAttribute,
+		handleTargetAttribute,
+	];
+	const values = [`->${context.identifier}@`, `->${context.identifier}.`];
 
-	const prefix = `${context.element.id}->${context.identifier}.`;
-	const inputs = document.querySelectorAll(`[data-petal-input^="${prefix}"]`);
-	const outputs = document.querySelectorAll(`[data-petal-output^="${prefix}"]`);
+	for (const attribute of attributes) {
+		const index = attributes.indexOf(attribute);
+		const callback = callbacks[index];
+		const value = index === 0 ? values[0] : values[1];
 
-	const matrix = [inputs, outputs];
+		const targets = document.querySelectorAll(
+			`[data-${attribute}*="${value}"]`,
+		);
 
-	for (const elements of matrix) {
-		const index = matrix.indexOf(elements);
+		if (targets.length === 0) {
+			continue;
+		}
 
-		const attribute = index === 0 ? 'data-petal-input' : 'data-petal-output';
-		const callback = index === 0 ? handleInputAttribute : handleOutputAttribute;
+		for (const target of targets) {
+			const attributes = Array.from(target.attributes);
 
-		for (const element of elements) {
-			const [, , , name] =
-				/^(\w+)->(\w+)\.(\w+)$/.exec(element.getAttribute(attribute) ?? '') ??
-				[];
-
-			if (name != null) {
-				callback(element, '', name, true, context);
+			for (const attribute of attributes) {
+				if (attribute.value.includes(value)) {
+					callback(target, '', attribute.value, true);
+				}
 			}
 		}
-	}
-}
-
-export function handleExternalInputAttribute(
-	element: Element,
-	_: string,
-	value: string,
-	added: boolean,
-): void {
-	handleExternalTargetAttribute(element, value, true, added);
-}
-
-export function handleExternalOutputAttribute(
-	element: Element,
-	_: string,
-	value: string,
-	added: boolean,
-): void {
-	handleExternalTargetAttribute(element, value, false, added);
-}
-
-function handleExternalTargetAttribute(
-	element: Element,
-	value: string,
-	input: boolean,
-	added: boolean,
-): void {
-	const [, identifier, controller, name] =
-		/^(\w+)->(\w+)\.(\w+)$/.exec(value) ?? [];
-
-	if (identifier == null || controller == null || name == null) {
-		return;
-	}
-
-	const identified = document.querySelector(`#${identifier}`);
-
-	const context =
-		identified && controllers.get(controller)?.instances.get(element);
-
-	if (context != null) {
-		(input ? handleInputAttribute : handleOutputAttribute)(
-			element,
-			'',
-			name,
-			added,
-			context,
-		);
 	}
 }
 
@@ -275,21 +237,8 @@ export function handleInputAttribute(
 	_: string,
 	value: string,
 	added: boolean,
-	context?: Context,
 ): void {
-	if (context != null && element instanceof HTMLInputElement) {
-		handleActionAttribute(
-			element,
-			'',
-			'input',
-			added,
-			context,
-			(event: Event) => {
-				context.data.value[value] = (event.target as HTMLInputElement).value;
-			},
-		);
-		handleTargetAttribute(element, '', `input:${value}`, added, context);
-	}
+	handleTarget(element, value, added, targetPattern, handleInput);
 }
 
 export function handleOutputAttribute(
@@ -297,9 +246,40 @@ export function handleOutputAttribute(
 	_: string,
 	value: string,
 	added: boolean,
-	context?: Context,
 ): void {
-	handleTargetAttribute(element, '', `output:${value}`, added, context);
+	handleTarget(element, value, added, targetPattern, handleOutput);
+}
+
+function handleTarget(
+	element: Element,
+	value: string,
+	added: boolean,
+	pattern: RegExp,
+	callback: HandleCallback,
+): void {
+	const [, identifier, controller, name] = pattern.exec(value) ?? [];
+
+	if (controller == null || name == null) {
+		return;
+	}
+
+	let identified: Element | null;
+
+	if (identifier == null) {
+		identified = element.closest(`[data-petal*="${controller}"]`);
+	} else {
+		identified = document.querySelector(`#${identifier}`);
+	}
+
+	if (identified == null) {
+		return;
+	}
+
+	const context = controllers.get(controller)?.instances.get(identified);
+
+	if (context != null) {
+		callback(context, element, '', name, added);
+	}
 }
 
 export function handleTargetAttribute(
@@ -307,11 +287,54 @@ export function handleTargetAttribute(
 	_: string,
 	value: string,
 	added: boolean,
-	context?: Context,
+): void {
+	handleTarget(element, value, added, targetPattern, handleTargetElement);
+}
+
+function handleInput(
+	context: Context,
+	element: Element,
+	_: string,
+	value: string,
+	added: boolean,
+): void {
+	if (
+		context != null &&
+		(element instanceof HTMLInputElement ||
+			element instanceof HTMLTextAreaElement)
+	) {
+		const checkbox = element.getAttribute('type') === 'checkbox';
+
+		handleAction(context, element, '', 'input', added, (event: Event) => {
+			context.data.value[value] = checkbox
+				? (event.target as HTMLInputElement).checked
+				: (event.target as HTMLInputElement).value;
+		});
+
+		handleTargetElement(context, element, '', `input:${value}`, added);
+	}
+}
+
+function handleOutput(
+	context: Context,
+	element: Element,
+	_: string,
+	value: string,
+	added: boolean,
+): void {
+	handleTargetElement(context, element, '', `output:${value}`, added);
+}
+
+function handleTargetElement(
+	context: Context,
+	element: Element,
+	_: string,
+	value: string,
+	added: boolean,
 ): void {
 	if (added) {
-		context?.targets.add(value, element);
+		context.targets.add(value, element);
 	} else {
-		context?.targets.remove(value, element);
+		context.targets.remove(value, element);
 	}
 }

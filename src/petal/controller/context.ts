@@ -1,9 +1,9 @@
-import {handleExternalAttributes} from '../observer/attributes';
+import {handleAttributes} from '../observer/attributes';
 import {observeController} from '../observer/controller.observer';
 import type {Observer} from '../observer/observer';
-import {createActions, type Actions} from '../store/action.store';
-import {createData, type Data} from '../store/data.store';
-import {createTargets, type Targets} from '../store/target.store';
+import {type Actions, createActions} from '../store/action.store';
+import {type Data, createData} from '../store/data.store';
+import {type Targets, createTargets} from '../store/target.store';
 import type {Controller, ControllerConstructor} from './controller';
 
 export type Context = {
@@ -48,17 +48,11 @@ export function createContext(
 			value: controller,
 		},
 		observer: {
-			value: observeController(context, {
-				action: `data-${name}-action`,
-				data: `data-${name}-data-`,
-				input: `data-${name}-input`,
-				output: `data-${name}-output`,
-				target: `data-${name}-target`,
-			}),
+			value: observeController(context),
 		},
 	});
 
-	handleExternalAttributes(context);
+	handleAttributes(context);
 
 	controller.connected?.();
 

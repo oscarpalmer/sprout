@@ -1,22 +1,34 @@
 import {attribute} from '../controller/controller';
 import {
+	handleActionAttribute,
 	handleAttributeChanges,
 	handleControllerAttribute,
-	handleExternalInputAttribute,
-	handleExternalOutputAttribute,
+	handleInputAttribute,
+	handleOutputAttribute,
+	handleTargetAttribute,
 } from './attributes';
-import {type Observer, createObserver, options} from './observer';
+import {createObserver, options, type Observer} from './observer';
 
 export function observeDocument(): Observer {
-	const inputAttribute = `${attribute}-input`;
-	const outputAttribute = `${attribute}-output`;
+	const actionAttribute = 'data-action';
+	const inputAttribute = 'data-input';
+	const outputAttribute = 'data-output';
+	const targetAttribute = 'data-target';
 
-	const attributes = [attribute, inputAttribute, outputAttribute];
+	const attributes = [
+		actionAttribute,
+		attribute,
+		inputAttribute,
+		outputAttribute,
+		targetAttribute,
+	];
 
 	const callbacks = {
+		[actionAttribute]: handleActionAttribute,
 		[attribute]: handleControllerAttribute,
-		[inputAttribute]: handleExternalInputAttribute,
-		[outputAttribute]: handleExternalOutputAttribute,
+		[inputAttribute]: handleInputAttribute,
+		[outputAttribute]: handleOutputAttribute,
+		[targetAttribute]: handleTargetAttribute,
 	};
 
 	return createObserver(

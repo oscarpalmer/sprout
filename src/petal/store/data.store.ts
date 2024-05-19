@@ -25,7 +25,11 @@ function setValue(
 	const inputs = context.targets.get(`input:${name}`);
 
 	for (const input of inputs) {
-		if (input instanceof HTMLInputElement && input.value !== stringified) {
+		if (
+			(input instanceof HTMLInputElement ||
+				input instanceof HTMLTextAreaElement) &&
+			input.value !== stringified
+		) {
 			input.value = stringified;
 		}
 	}
@@ -39,7 +43,7 @@ function setValue(
 
 export function createData(identifier: string, context: Context): Data {
 	const frames: Record<string, number> = {};
-	const prefix = `data-${identifier}-data-`;
+	const prefix = `data-${identifier}-`;
 
 	const instance = Object.create(null);
 
