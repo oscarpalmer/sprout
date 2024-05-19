@@ -17,42 +17,16 @@ class Controller {
   }
 }
 
-// src/petal/helpers/event.ts
-function getEventParameters(element, action) {
-  const matches = action.match(pattern);
-  if (matches != null) {
-    const [, type, callback, options] = matches;
-    const parameters = {
-      callback,
-      options: getOptions(options ?? ""),
-      type: type ?? getType(element)
-    };
-    return parameters.type == null ? undefined : parameters;
+// src/petal/observer/attributes/data.attribute.ts
+function handleDataAttribute(context, name, value) {
+  let data;
+  try {
+    data = JSON.parse(value);
+  } catch (_) {
+    data = value;
   }
+  context.data.value[name] = data;
 }
-var getOptions = function(options) {
-  const items = options.toLowerCase().split(":");
-  return {
-    capture: items.includes("capture") || items.includes("c"),
-    once: items.includes("once") || items.includes("o"),
-    passive: !items.includes("active") && !items.includes("a")
-  };
-};
-var getType = function(element) {
-  if (element instanceof HTMLInputElement) {
-    return element.type === "submit" ? "submit" : "input";
-  }
-  return defaultEvents[element.tagName.toLowerCase()];
-};
-var defaultEvents = {
-  a: "click",
-  button: "click",
-  details: "toggle",
-  form: "submit",
-  select: "change",
-  textarea: "input"
-};
-var pattern = /^(?:(\w+)@)?(\w+)(?::([a-z:]+))?$/i;
 
 // src/petal/observer/observer.ts
 function createObserver(element, options, attributeHandler) {
@@ -325,25 +299,94 @@ function removeController(name, element) {
 }
 var controllers = new Map;
 
-// src/petal/observer/attributes.ts
-var getChanges = function(from, to) {
-  const fromValues = from.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
-  const toValues = to.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
-  const attributes3 = [[], []];
-  for (let outer = 0;outer < 2; outer += 1) {
-    const values = outer === 0 ? fromValues : toValues;
-    const other = outer === 1 ? fromValues : toValues;
-    const { length } = values;
-    for (let inner = 0;inner < length; inner += 1) {
-      const value = values[inner];
-      if (!other.includes(value)) {
-        attributes3[outer].push(value);
-      }
-    }
+// src/petal/helpers/event.ts
+function getEventParameters(element, action2) {
+  const matches = action2.match(pattern);
+  if (matches != null) {
+    const [, type, callback, options2] = matches;
+    const parameters = {
+      callback,
+      options: getOptions(options2 ?? ""),
+      type: type ?? getType(element)
+    };
+    return parameters.type == null ? undefined : parameters;
   }
-  return attributes3;
+}
+var getOptions = function(options2) {
+  const items = options2.toLowerCase().split(":");
+  return {
+    capture: items.includes("capture") || items.includes("c"),
+    once: items.includes("once") || items.includes("o"),
+    passive: !items.includes("active") && !items.includes("a")
+  };
 };
-var handleAction = function(context2, element, _, value, added, handler) {
+var getType = function(element) {
+  if (element instanceof HTMLInputElement) {
+    return element.type === "submit" ? "submit" : "input";
+  }
+  return defaultEvents[element.tagName.toLowerCase()];
+};
+var defaultEvents = {
+  a: "click",
+  button: "click",
+  details: "toggle",
+  form: "submit",
+  select: "change",
+  textarea: "input"
+};
+var pattern = /^(?:(\w+)@)?(\w+)(?::([a-z:]+))?$/i;
+
+// src/petal/observer/attributes/target.attribute.ts
+function handleInputAttribute(element, _, value, added) {
+  handleTarget(element, value, added, attributeTargetPattern, handleInput);
+}
+function handleOutputAttribute(element, _, value, added) {
+  handleTarget(element, value, added, attributeTargetPattern, handleOutput);
+}
+function handleTarget(element, value, added, pattern2, callback) {
+  const [, identifier, controller3, name] = pattern2.exec(value) ?? [];
+  if (controller3 == null || name == null) {
+    return;
+  }
+  let identified;
+  if (identifier == null) {
+    identified = element.closest(`[data-petal*="${controller3}"]`);
+  } else {
+    identified = document.querySelector(`#${identifier}`);
+  }
+  if (identified == null) {
+    return;
+  }
+  const context2 = controllers.get(controller3)?.instances.get(identified);
+  if (context2 != null) {
+    callback(context2, element, "", name, added);
+  }
+}
+function handleTargetAttribute(element, _, value, added) {
+  handleTarget(element, value, added, attributeTargetPattern, handleTargetElement);
+}
+var handleInput = function(context2, element, _, value, added) {
+  if (context2 != null && (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
+    const checkbox = element.getAttribute("type") === "checkbox";
+    handleAction(context2, element, "", "input", added, (event) => {
+      context2.data.value[value] = checkbox ? event.target.checked : event.target.value;
+    });
+    handleTargetElement(context2, element, "", `input:${value}`, added);
+  }
+};
+var handleOutput = function(context2, element, _, value, added) {
+  handleTargetElement(context2, element, "", `output:${value}`, added);
+};
+var handleTargetElement = function(context2, element, _, value, added) {
+  if (added) {
+    context2.targets.add(value, element);
+  } else {
+    context2.targets.remove(value, element);
+  }
+};
+
+// src/petal/observer/attributes/action.attribute.ts
+function handleAction(context2, element, _, value, added, handler) {
   if (context2.actions.has(value)) {
     if (added) {
       context2.actions.add(value, element);
@@ -370,10 +413,29 @@ var handleAction = function(context2, element, _, value, added, handler) {
     });
     context2.actions.add(value, element);
   }
-};
-function handleActionAttribute(element, _, value, added) {
-  handleTarget(element, value, added, actionPattern, handleAction);
 }
+function handleActionAttribute(element, _, value, added) {
+  handleTarget(element, value, added, attributeActionPattern, handleAction);
+}
+
+// src/petal/observer/attributes/index.ts
+var getChanges = function(from, to) {
+  const fromValues = from.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
+  const toValues = to.split(/\s+/).map((part) => part.trim()).filter((part) => part.length > 0);
+  const attributes2 = [[], []];
+  for (let outer = 0;outer < 2; outer += 1) {
+    const values = outer === 0 ? fromValues : toValues;
+    const other = outer === 1 ? fromValues : toValues;
+    const { length } = values;
+    for (let inner = 0;inner < length; inner += 1) {
+      const value = values[inner];
+      if (!other.includes(value)) {
+        attributes2[outer].push(value);
+      }
+    }
+  }
+  return attributes2;
+};
 function handleAttributeChanges(parameters) {
   const callback = parameters.callbacks[parameters.name];
   if (callback == null) {
@@ -411,17 +473,8 @@ function handleControllerAttribute(element, _, value, added) {
     removeController(value, element);
   }
 }
-function handleDataAttribute(context2, name, value) {
-  let data2;
-  try {
-    data2 = JSON.parse(value);
-  } catch (_) {
-    data2 = value;
-  }
-  context2.data.value[name] = data2;
-}
 function handleAttributes(context2) {
-  const attributes3 = ["action", "input", "output", "target"];
+  const attributes2 = ["action", "input", "output", "target"];
   const callbacks = [
     handleActionAttribute,
     handleInputAttribute,
@@ -429,73 +482,26 @@ function handleAttributes(context2) {
     handleTargetAttribute
   ];
   const values = [`->${context2.identifier}@`, `->${context2.identifier}.`];
-  for (const attribute2 of attributes3) {
-    const index = attributes3.indexOf(attribute2);
+  for (const attribute2 of attributes2) {
+    const index = attributes2.indexOf(attribute2);
     const callback = callbacks[index];
     const value = index === 0 ? values[0] : values[1];
     const targets = document.querySelectorAll(`[data-${attribute2}*="${value}"]`);
     if (targets.length === 0) {
       continue;
     }
-    for (const target2 of targets) {
-      const attributes4 = Array.from(target2.attributes);
-      for (const attribute3 of attributes4) {
+    for (const target4 of targets) {
+      const attributes3 = Array.from(target4.attributes);
+      for (const attribute3 of attributes3) {
         if (attribute3.value.includes(value)) {
-          callback(target2, "", attribute3.value, true);
+          callback(target4, "", attribute3.value, true);
         }
       }
     }
   }
 }
-function handleInputAttribute(element, _, value, added) {
-  handleTarget(element, value, added, targetPattern, handleInput);
-}
-function handleOutputAttribute(element, _, value, added) {
-  handleTarget(element, value, added, targetPattern, handleOutput);
-}
-var handleTarget = function(element, value, added, pattern2, callback) {
-  const [, identifier, controller3, name] = pattern2.exec(value) ?? [];
-  if (controller3 == null || name == null) {
-    return;
-  }
-  let identified;
-  if (identifier == null) {
-    identified = element.closest(`[data-petal*="${controller3}"]`);
-  } else {
-    identified = document.querySelector(`#${identifier}`);
-  }
-  if (identified == null) {
-    return;
-  }
-  const context2 = controllers.get(controller3)?.instances.get(identified);
-  if (context2 != null) {
-    callback(context2, element, "", name, added);
-  }
-};
-function handleTargetAttribute(element, _, value, added) {
-  handleTarget(element, value, added, targetPattern, handleTargetElement);
-}
-var handleInput = function(context2, element, _, value, added) {
-  if (context2 != null && (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
-    const checkbox = element.getAttribute("type") === "checkbox";
-    handleAction(context2, element, "", "input", added, (event2) => {
-      context2.data.value[value] = checkbox ? event2.target.checked : event2.target.value;
-    });
-    handleTargetElement(context2, element, "", `input:${value}`, added);
-  }
-};
-var handleOutput = function(context2, element, _, value, added) {
-  handleTargetElement(context2, element, "", `output:${value}`, added);
-};
-var handleTargetElement = function(context2, element, _, value, added) {
-  if (added) {
-    context2.targets.add(value, element);
-  } else {
-    context2.targets.remove(value, element);
-  }
-};
-var actionPattern = /^(?:(\w+)->)?(\w+)@(\w+)$/;
-var targetPattern = /^(?:(\w+)->)?(\w+)?\.(\w+)$/;
+var attributeActionPattern = /^(?:(\w+)->)?(\w+)@(\w+)$/;
+var attributeTargetPattern = /^(?:(\w+)->)?(\w+)?\.(\w+)$/;
 
 // src/petal/observer/document.observer.ts
 function observeDocument() {
@@ -503,7 +509,7 @@ function observeDocument() {
   const inputAttribute = "data-input";
   const outputAttribute = "data-output";
   const targetAttribute = "data-target";
-  const attributes4 = [
+  const attributes3 = [
     actionAttribute,
     attribute,
     inputAttribute,
@@ -519,7 +525,7 @@ function observeDocument() {
   };
   return createObserver(document.body, {
     ...options,
-    attributeFilter: attributes4
+    attributeFilter: attributes3
   }, (element, name, value, added) => {
     handleAttributeChanges({
       added,

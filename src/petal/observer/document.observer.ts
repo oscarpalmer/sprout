@@ -1,13 +1,12 @@
 import {attribute} from '../controller/controller';
+import {handleAttributeChanges, handleControllerAttribute} from './attributes';
+import {handleActionAttribute} from './attributes/action.attribute';
 import {
-	handleActionAttribute,
-	handleAttributeChanges,
-	handleControllerAttribute,
 	handleInputAttribute,
 	handleOutputAttribute,
 	handleTargetAttribute,
-} from './attributes';
-import {createObserver, options, type Observer} from './observer';
+} from './attributes/target.attribute';
+import {type Observer, createObserver, options} from './observer';
 
 export function observeDocument(): Observer {
 	const actionAttribute = 'data-action';

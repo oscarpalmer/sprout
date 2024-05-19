@@ -1,5 +1,5 @@
 import type {Context} from '../controller/context';
-import {handleDataAttribute} from './attributes';
+import {handleDataAttribute} from './attributes/data.attribute';
 import {type Observer, createObserver, options} from './observer';
 
 export function observeController(context: Context): Observer {
