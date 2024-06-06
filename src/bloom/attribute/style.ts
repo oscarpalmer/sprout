@@ -1,4 +1,4 @@
-import {type Effect,effect, isReactive } from '@oscarpalmer/sentinel';
+import {effect, isReactive, type Effect} from '@oscarpalmer/sentinel';
 import {isStylableElement} from '../helpers/is';
 
 export function setStyle(

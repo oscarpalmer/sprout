@@ -4,14 +4,14 @@
 		"url": "https://oscarpalmer.se"
 	},
 	"dependencies": {
-		"@oscarpalmer/atoms": "^0.37",
-		"@oscarpalmer/sentinel": "^0.18"
+		"@oscarpalmer/atoms": "^0.37.0",
+		"@oscarpalmer/sentinel": "^0.18.2"
 	},
 	"description": "… sprouting like a cute little weird flower",
 	"devDependencies": {
-		"@biomejs/biome": "^1.7",
-		"bun": "^1.1",
-		"typescript": "^5.4"
+		"@biomejs/biome": "^1.8.0",
+		"bun": "^1.1.12",
+		"typescript": "^5.4.5"
 	},
 	"exports": {
 		".": {

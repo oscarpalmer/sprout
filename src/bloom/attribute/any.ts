@@ -1,4 +1,5 @@
-import {effect, isReactive, type Effect} from '@oscarpalmer/sentinel';
+import type {PlainObject} from '@oscarpalmer/atoms/models';
+import {type Effect, effect, isReactive} from '@oscarpalmer/sentinel';
 
 export const booleanAttributes = new Set([
 	'checked',
@@ -53,5 +54,5 @@ function setBooleanAttribute(
 	name: string,
 	value: unknown,
 ): void {
-	(element as any)[name] = /^(|true)$/i.test(String(value));
+	(element as unknown as PlainObject)[name] = /^(|true)$/i.test(String(value));
 }

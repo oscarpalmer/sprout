@@ -1,6 +1,6 @@
 import type {Context} from '../controller/context';
 import {handleDataAttribute} from './attributes/data.attribute';
-import {type Observer, createObserver, options} from './observer';
+import {createObserver, options, type Observer} from './observer';
 
 export function observeController(context: Context): Observer {
 	const prefix = `data-${context.identifier}-`;

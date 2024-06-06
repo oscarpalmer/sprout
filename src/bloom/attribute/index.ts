@@ -1,4 +1,4 @@
-import {type Effect, isEffect} from '@oscarpalmer/sentinel';
+import {isEffect, type Effect} from '@oscarpalmer/sentinel';
 import {addEvent} from '../helpers/event';
 import {isBadAttribute} from '../helpers/is';
 import {storeNode} from '../store';
