@@ -1,7 +1,7 @@
 import type {Context} from '../../controller/context';
 import {controllers} from '../../store/controller.store';
 import {handleAction} from './action.attribute';
-import {attributeTargetPattern, type AttributeHandleCallback} from './index';
+import {type AttributeHandleCallback, attributeTargetPattern} from './index';
 
 export function handleInputAttribute(
 	element: Element,

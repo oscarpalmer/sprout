@@ -26,9 +26,5 @@ function updateClassList(
 	classes: string[],
 	value: unknown,
 ): void {
-	if (value === true) {
-		element.classList.add(...classes);
-	} else {
-		element.classList.remove(...classes);
-	}
+	element.classList[value === true ? 'add' : 'remove'](...classes);
 }

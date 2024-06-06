@@ -36,16 +36,15 @@ function setAnyAttribute(
 	value: unknown,
 	isValue: boolean,
 ): void {
-	if (isValue) {
-		(element as HTMLInputElement).value = String(value);
-
-		return;
-	}
-
-	if (value == null) {
-		element.removeAttribute(name);
-	} else {
-		element.setAttribute(name, String(value));
+	switch (true) {
+		case isValue:
+			(element as HTMLInputElement).value = String(value);
+			break;
+		case value == null:
+			element.removeAttribute(name);
+			break;
+		default:
+			element.setAttribute(name, String(value));
 	}
 }
 

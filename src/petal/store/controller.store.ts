@@ -1,4 +1,4 @@
-import {createContext, type Context} from '../controller/context';
+import {type Context, createContext} from '../controller/context';
 import type {ControllerConstructor} from '../controller/controller';
 
 type StoredController = {

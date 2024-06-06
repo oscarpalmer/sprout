@@ -8,17 +8,19 @@ export function addEvent(
 ): void {
 	element.removeAttribute(attribute);
 
-	if (typeof value !== 'function') {
-		return;
+	if (typeof value === 'function') {
+		const parameters = getParameters(attribute);
+
+		element.addEventListener(
+			parameters.name,
+			value as never,
+			parameters.options,
+		);
+
+		storeNode(element, {
+			event: {element, listener: value as never, ...parameters},
+		});
 	}
-
-	const parameters = getParameters(attribute);
-
-	element.addEventListener(parameters.name, value as never, parameters.options);
-
-	storeNode(element, {
-		event: {element, listener: value as never, ...parameters},
-	});
 }
 
 function getParameters(attribute: string): EventParameters {

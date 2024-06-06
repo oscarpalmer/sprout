@@ -151,14 +151,13 @@ var store = new WeakMap;
 // src/bloom/helpers/event.ts
 function addEvent(element, attribute, value9) {
   element.removeAttribute(attribute);
-  if (typeof value9 !== "function") {
-    return;
+  if (typeof value9 === "function") {
+    const parameters = getParameters(attribute);
+    element.addEventListener(parameters.name, value9, parameters.options);
+    storeNode(element, {
+      event: { element, listener: value9, ...parameters }
+    });
   }
-  const parameters = getParameters(attribute);
-  element.addEventListener(parameters.name, value9, parameters.options);
-  storeNode(element, {
-    event: { element, listener: value9, ...parameters }
-  });
 }
 var getParameters = function(attribute) {
   const parts = attribute.slice(1).toLowerCase().split(":");
@@ -182,14 +181,15 @@ function setAny(element, name, value9) {
   callback(element, name, value9, isValue);
 }
 var setAnyAttribute = function(element, name, value9, isValue) {
-  if (isValue) {
-    element.value = String(value9);
-    return;
-  }
-  if (value9 == null) {
-    element.removeAttribute(name);
-  } else {
-    element.setAttribute(name, String(value9));
+  switch (true) {
+    case isValue:
+      element.value = String(value9);
+      break;
+    case value9 == null:
+      element.removeAttribute(name);
+      break;
+    default:
+      element.setAttribute(name, String(value9));
   }
 };
 var setBooleanAttribute = function(element, name, value9) {
@@ -219,11 +219,7 @@ function setClasses(element, name, value9) {
   updateClassList(element, classes, value9);
 }
 var updateClassList = function(element, classes, value9) {
-  if (value9 === true) {
-    element.classList.add(...classes);
-  } else {
-    element.classList.remove(...classes);
-  }
+  element.classList[value9 === true ? "add" : "remove"](...classes);
 };
 
 // src/bloom/attribute/style.ts
@@ -297,10 +293,7 @@ function createNode(value9) {
   if (value9 instanceof Node) {
     return value9;
   }
-  if (isBloom(value9)) {
-    return value9.grow();
-  }
-  return document.createTextNode(String(value9));
+  return isBloom(value9) ? value9.grow() : document.createTextNode(String(value9));
 }
 function createNodes(html) {
   const template = document.createElement("template");
@@ -338,15 +331,11 @@ function mapNodes(values, node) {
 }
 var setFunction = function(comment, callback) {
   const value9 = callback();
-  if (isReactive(value9)) {
-    setReactive(comment, value9);
-  } else {
-    setNode(comment, value9);
-  }
+  (isReactive(value9) ? setReactive : setNode)(comment, value9);
 };
 var setNode = function(comment, value9) {
   const node = createNode(value9);
-  comment.replaceWith(.../^documentfragment$/i.test(node.constructor.name) ? Array.from(node.childNodes) : [node]);
+  comment.replaceWith(.../^documentfragment$/i.test(node.constructor.name) ? [...node.childNodes] : [node]);
 };
 var setReactive = function(comment, reactive3) {
   const text = document.createTextNode("");
@@ -364,12 +353,9 @@ var setReactive = function(comment, reactive3) {
 };
 var setValue2 = function(values, comment) {
   const value9 = values[getIndex2(comment.nodeValue ?? "")];
-  if (value9 == null) {
-    return;
-  }
   if (typeof value9 === "function") {
     setFunction(comment, value9);
-  } else {
+  } else if (value9 != null) {
     setNode(comment, value9);
   }
 };

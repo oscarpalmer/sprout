@@ -50,26 +50,20 @@ export function storeNode(node: Node, data: Partial<StoredParameters>): void {
 function updateNode(type: 'disable' | 'enable', node: Node): void {
 	const stored = store.get(node);
 
-	if (stored == null) {
-		updateNodes(type, node);
+	if (stored != null) {
+		const name = type === 'disable' ? 'stop' : 'start';
 
-		return;
-	}
-
-	for (const effect of stored.effects) {
-		if (type === 'disable') {
-			effect.stop();
-		} else {
-			effect.start();
+		for (const effect of stored.effects) {
+			effect[name]();
 		}
-	}
 
-	const callback =
-		type === 'disable' ? node.removeEventListener : node.addEventListener;
+		const callback =
+			type === 'disable' ? node.removeEventListener : node.addEventListener;
 
-	for (const [name, listeners] of stored.events) {
-		for (const [listener, data] of listeners) {
-			callback(name, listener, data.options);
+		for (const [name, listeners] of stored.events) {
+			for (const [listener, data] of listeners) {
+				callback(name, listener, data.options);
+			}
 		}
 	}
 
@@ -77,16 +71,14 @@ function updateNode(type: 'disable' | 'enable', node: Node): void {
 }
 
 function updateNodes(type: 'disable' | 'enable', node: Node): void {
-	if (!node.hasChildNodes()) {
-		return;
-	}
+	if (node.hasChildNodes()) {
+		const children = Array.from(node.childNodes);
+		const {length} = children;
 
-	const children = Array.from(node.childNodes);
-	const {length} = children;
+		let index = 0;
 
-	let index = 0;
-
-	for (; index < length; index += 1) {
-		updateNode(type, children[index]);
+		for (; index < length; index += 1) {
+			updateNode(type, children[index]);
+		}
 	}
 }

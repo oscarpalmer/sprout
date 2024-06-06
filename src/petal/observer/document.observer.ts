@@ -6,7 +6,7 @@ import {
 	handleOutputAttribute,
 	handleTargetAttribute,
 } from './attributes/target.attribute';
-import {type Observer, createObserver, options} from './observer';
+import {createObserver, options, type Observer} from './observer';
 
 export function observeDocument(): Observer {
 	const actionAttribute = 'data-action';

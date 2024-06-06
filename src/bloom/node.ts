@@ -8,11 +8,7 @@ export function createNode(value: unknown): Node {
 		return value;
 	}
 
-	if (isBloom(value)) {
-		return value.grow();
-	}
-
-	return document.createTextNode(String(value));
+	return isBloom(value) ? value.grow() : document.createTextNode(String(value));
 }
 
 export function createNodes(html: string): Node {
@@ -68,14 +64,10 @@ export function mapNodes(values: unknown[], node: Node): Node {
 	return node;
 }
 
-function setFunction(comment: Comment, callback: () => void): void {
+function setFunction(comment: Comment, callback: () => unknown): void {
 	const value = callback();
 
-	if (isReactive(value)) {
-		setReactive(comment, value);
-	} else {
-		setNode(comment, value);
-	}
+	(isReactive(value) ? setReactive : setNode)(comment, value as never);
 }
 
 function setNode(comment: Comment, value: unknown): void {
@@ -83,7 +75,7 @@ function setNode(comment: Comment, value: unknown): void {
 
 	comment.replaceWith(
 		...(/^documentfragment$/i.test(node.constructor.name)
-			? Array.from(node.childNodes)
+			? [...node.childNodes]
 			: [node]),
 	);
 }
@@ -110,13 +102,9 @@ function setReactive(comment: Comment, reactive: Reactive): void {
 function setValue(values: unknown[], comment: Comment): void {
 	const value = values[getIndex(comment.nodeValue ?? '')];
 
-	if (value == null) {
-		return;
-	}
-
 	if (typeof value === 'function') {
 		setFunction(comment, value as never);
-	} else {
+	} else if (value != null) {
 		setNode(comment, value);
 	}
 }
