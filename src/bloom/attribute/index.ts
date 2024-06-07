@@ -1,4 +1,4 @@
-import {isEffect, type Effect} from '@oscarpalmer/sentinel';
+import {type Effect, isEffect} from '@oscarpalmer/sentinel';
 import {addEvent} from '../helpers/event';
 import {isBadAttribute} from '../helpers/is';
 import {storeNode} from '../store';
@@ -40,7 +40,7 @@ function getIndex(value: string): number {
 }
 
 export function mapAttributes(values: unknown[], element: Element): void {
-	const attributes = Array.from(element.attributes);
+	const attributes = [...element.attributes];
 	const {length} = attributes;
 
 	let index = 0;

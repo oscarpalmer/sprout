@@ -1,5 +1,5 @@
 import type {PlainObject} from '@oscarpalmer/atoms/models';
-import {type Effect, effect, isReactive} from '@oscarpalmer/sentinel';
+import {effect, isReactive, type Effect} from '@oscarpalmer/sentinel';
 
 export const booleanAttributes = new Set([
 	'checked',

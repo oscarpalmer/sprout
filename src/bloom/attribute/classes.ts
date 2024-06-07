@@ -1,4 +1,4 @@
-import {effect, isReactive, type Effect} from '@oscarpalmer/sentinel';
+import {type Effect, effect, isReactive} from '@oscarpalmer/sentinel';
 
 export function setClasses(
 	element: Element,

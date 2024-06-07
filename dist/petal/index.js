@@ -43,7 +43,7 @@ function createObserver(element, options, attributeHandler) {
   });
   const instance = Object.create({
     handleElement(element2, added) {
-      const attributes = Array.from(element2.attributes);
+      const attributes = [...element2.attributes];
       for (const attribute2 of attributes) {
         attributeHandler(element2, attribute2.name, "", added);
       }
@@ -228,7 +228,7 @@ function createTargets() {
       store.clear();
     },
     get(name) {
-      return Array.from(store.get(name) ?? []);
+      return [...store.get(name) ?? []];
     },
     remove(name, element) {
       store.get(name)?.delete(element);
@@ -491,7 +491,7 @@ function handleAttributes(context2) {
       continue;
     }
     for (const target4 of targets) {
-      const attributes3 = Array.from(target4.attributes);
+      const attributes3 = [...target4.attributes];
       for (const attribute3 of attributes3) {
         if (attribute3.value.includes(value)) {
           callback(target4, "", attribute3.value, true);

@@ -2,18 +2,16 @@ import type {StoredData, StoredParameters} from './models';
 
 const store = new WeakMap<Node, StoredData>();
 
-export function disableNode(node: Node): void {
-	updateNode('disable', node);
+export function disableStoredNode(node: Node, remove?: boolean): void {
+	updateStoredNode('disable', node, remove ?? false);
+
+	if (remove) {
+		node.parentNode?.removeChild(node);
+	}
 }
 
-export function enableNode(node: Node): void {
-	updateNode('enable', node);
-}
-
-export function removeNode(node: Node): void {
-	disableNode(node);
-
-	node.parentNode?.removeChild(node);
+export function enableStoredNode(node: Node): void {
+	updateStoredNode('enable', node, false);
 }
 
 export function storeNode(node: Node, data: Partial<StoredParameters>): void {
@@ -47,7 +45,11 @@ export function storeNode(node: Node, data: Partial<StoredParameters>): void {
 	}
 }
 
-function updateNode(type: 'disable' | 'enable', node: Node): void {
+function updateStoredNode(
+	type: 'disable' | 'enable',
+	node: Node,
+	clear: boolean,
+): void {
 	const stored = store.get(node);
 
 	if (stored != null) {
@@ -65,20 +67,30 @@ function updateNode(type: 'disable' | 'enable', node: Node): void {
 				callback(name, listener, data.options);
 			}
 		}
+
+		if (clear) {
+			stored.effects.clear();
+			stored.events.clear();
+			store.delete(node);
+		}
 	}
 
-	updateNodes(type, node);
+	updateStoredNodes(type, node, clear);
 }
 
-function updateNodes(type: 'disable' | 'enable', node: Node): void {
+function updateStoredNodes(
+	type: 'disable' | 'enable',
+	node: Node,
+	clear: boolean,
+): void {
 	if (node.hasChildNodes()) {
-		const children = Array.from(node.childNodes);
+		const children = [...node.childNodes];
 		const {length} = children;
 
 		let index = 0;
 
 		for (; index < length; index += 1) {
-			updateNode(type, children[index]);
+			updateStoredNode(type, children[index], clear);
 		}
 	}
 }

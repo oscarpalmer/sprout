@@ -151,7 +151,7 @@ export function handleAttributes(context: Context): void {
 		}
 
 		for (const target of targets) {
-			const attributes = Array.from(target.attributes);
+			const attributes = [...target.attributes];
 
 			for (const attribute of attributes) {
 				if (attribute.value.includes(value)) {

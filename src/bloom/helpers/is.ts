@@ -11,7 +11,7 @@ export function isBadAttribute(attribute: Attr): boolean {
 }
 
 export function isBloom(value: unknown): value is Bloom {
-	return (value as Record<string, unknown>)?.$sentinel === true;
+	return (value as Record<string, unknown>)?.$bloom === true;
 }
 
 export function isStylableElement(

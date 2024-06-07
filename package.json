@@ -47,12 +47,13 @@
 		"url": "git+https://github.com/oscarpalmer/sprout.git"
 	},
 	"scripts": {
-		"build": "bunx bun ./.bun.ts && bunx bun ./.bun.ts --mjs && bun run types",
+		"build": "bun run clean && bunx bun ./.bun.ts && bunx bun ./.bun.ts --mjs && bun run types",
+		"clean": "rm -rf ./dist && rm -rf ./types && rm -rf ./tsconfig.tsbuildinfo",
 		"test": "bun test",
 		"types": "bunx tsc -p ./tsconfig.json",
 		"watch": "bun build ./src/index.ts --outfile ./dist/index.js --watch"
 	},
 	"type": "module",
 	"types": "./types/index.d.ts",
-	"version": "0.13.0"
+	"version": "0.14.0"
 }

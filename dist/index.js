@@ -4,7 +4,7 @@ function isBadAttribute(attribute) {
   return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value);
 }
 function isBloom(value) {
-  return value?.$sentinel === true;
+  return value?.$bloom === true;
 }
 function isStylableElement(element) {
   return element instanceof HTMLElement || element instanceof SVGElement;
@@ -99,6 +99,9 @@ var effect = function(callback) {
 var isEffect = function(value) {
   return isSentinel(value, /^effect$/i);
 };
+var isList = function(value) {
+  return isSentinel(value, /^list$/i);
+};
 var isReactive = function(value) {
   return isSentinel(value, /^computed|list|signal|store$/i);
 };
@@ -123,6 +126,12 @@ var arrayOperations = new Set([
 var primitives = new Set(["boolean", "number", "string"]);
 
 // src/bloom/store.ts
+function disableStoredNode(node, remove) {
+  updateStoredNode("disable", node, remove ?? false);
+  if (remove) {
+    node.parentNode?.removeChild(node);
+  }
+}
 function storeNode(node, data) {
   let stored = store.get(node);
   if (stored == null) {
@@ -146,6 +155,37 @@ function storeNode(node, data) {
     }
   }
 }
+var updateStoredNode = function(type, node, clear) {
+  const stored = store.get(node);
+  if (stored != null) {
+    const name = type === "disable" ? "stop" : "start";
+    for (const effect5 of stored.effects) {
+      effect5[name]();
+    }
+    const callback = type === "disable" ? node.removeEventListener : node.addEventListener;
+    for (const [name2, listeners] of stored.events) {
+      for (const [listener, data] of listeners) {
+        callback(name2, listener, data.options);
+      }
+    }
+    if (clear) {
+      stored.effects.clear();
+      stored.events.clear();
+      store.delete(node);
+    }
+  }
+  updateStoredNodes(type, node, clear);
+};
+var updateStoredNodes = function(type, node, clear) {
+  if (node.hasChildNodes()) {
+    const children = [...node.childNodes];
+    const { length } = children;
+    let index = 0;
+    for (;index < length; index += 1) {
+      updateStoredNode(type, children[index], clear);
+    }
+  }
+};
 var store = new WeakMap;
 
 // src/bloom/helpers/event.ts
@@ -265,7 +305,7 @@ var getIndex = function(value9) {
   return index == null ? -1 : +index;
 };
 function mapAttributes(values, element) {
-  const attributes = Array.from(element.attributes);
+  const attributes = [...element.attributes];
   const { length } = attributes;
   let index = 0;
   for (;index < length; index += 1) {
@@ -288,30 +328,159 @@ function mapAttributes(values, element) {
   }
 }
 
-// src/bloom/node.ts
-function createNode(value9) {
-  if (value9 instanceof Node) {
-    return value9;
+// src/bloom/helpers/index.ts
+function compareArrayOrder(first, second) {
+  const firstIsLarger = first.length > second.length;
+  const from = firstIsLarger ? first : second;
+  const to = firstIsLarger ? second : first;
+  if (!from.filter((key) => to.includes(key)).every((key, index) => to[index] === key)) {
+    return "dissimilar";
   }
-  return isBloom(value9) ? value9.grow() : document.createTextNode(String(value9));
+  return firstIsLarger ? "removed" : "added";
+}
+
+// src/bloom/node/identified.ts
+function createIdentified(template) {
+  return {
+    identifier: template.id,
+    nodes: createIdentifieds(template.grow()).flatMap((item) => item.nodes)
+  };
+}
+function createIdentifieds(value9) {
+  return (Array.isArray(value9) ? value9 : [value9]).map((item) => ({
+    nodes: getNodes(item)
+  }));
+}
+function replaceIdentified(from, to, setNodes) {
+  const nodes = from.flatMap((item) => item.nodes);
+  for (const node of nodes) {
+    if (nodes.indexOf(node) === 0) {
+      node.before(...to.flatMap((item) => item.nodes));
+    }
+    disableStoredNode(node, true);
+  }
+  return setNodes ? to : null;
+}
+function updateIdentified(identified, identifiers, templates) {
+  const observed = [];
+  for (const template of templates) {
+    observed.push(identified.find((item) => item.identifier === template.id) ?? createIdentified(template));
+  }
+  const oldIdentifiers = identified.map((item) => item.identifier);
+  const comparison = compareArrayOrder(oldIdentifiers, identifiers);
+  let position = identified[0].nodes[0];
+  if (comparison !== "removed") {
+    const items = observed.flatMap((item) => item.nodes.map((node) => ({
+      id: item.identifier,
+      value: node
+    })));
+    const before = comparison === "added" && !oldIdentifiers.includes(observed[0].identifier);
+    for (const item of items) {
+      if (comparison === "dissimilar" || !oldIdentifiers.includes(item.id)) {
+        if (items.indexOf(item) === 0 && before) {
+          position.before(item.value);
+        } else {
+          position.after(item.value);
+        }
+      }
+      position = item.value;
+    }
+  }
+  const nodes = identified.filter((item) => !identifiers.includes(item.identifier)).flatMap((item) => item.nodes);
+  for (const node of nodes) {
+    disableStoredNode(node, true);
+  }
+  return observed;
+}
+
+// src/bloom/node/value.ts
+var setFunctionValue = function(comment, callback) {
+  const value9 = callback();
+  (isReactive(value9) ? setReactiveValue : setNodeValue)(comment, value9);
+};
+var setNodeValue = function(comment, value9) {
+  comment.replaceWith(...getNodes(createNode(value9)));
+};
+var setReactiveList = function(comment, reactive3) {
+  let identified2;
+  effect(() => {
+    const list4 = reactive3.get();
+    if (list4.length === 0) {
+      identified2 = replaceIdentified(identified2 ?? [], [{ nodes: [comment] }], false);
+      return;
+    }
+    let templates = list4.filter((item) => isBloom(item) && item.id != null);
+    const identifiers = templates.map((item) => item.id);
+    if (new Set(identifiers).size !== identifiers.length) {
+      templates = [];
+    }
+    identified2 = identified2 == null || templates.length === 0 ? replaceIdentified(identified2 ?? [{ nodes: [comment] }], templates.length > 0 ? templates.map((template) => createIdentified(template)) : createIdentifieds(list4.map(createNode)), true) : updateIdentified(identified2, identifiers, templates);
+  });
+};
+var setReactiveText = function(comment, reactive3) {
+  const text = document.createTextNode("");
+  const fx = effect(() => {
+    const value9 = reactive3.get();
+    text.textContent = String(value9);
+    if (value9 == null && text.parentNode != null) {
+      text.replaceWith(comment);
+    } else if (value9 != null && text.parentNode == null) {
+      comment.replaceWith(text);
+    }
+  });
+  storeNode(comment, { effect: fx });
+  storeNode(text, { effect: fx });
+};
+var setReactiveValue = function(comment, reactive3) {
+  if (isList(reactive3) || Array.isArray(reactive3.peek())) {
+    setReactiveList(comment, reactive3);
+  } else {
+    setReactiveText(comment, reactive3);
+  }
+};
+function setValue2(values, comment) {
+  const value9 = values[getIndex2(comment.nodeValue ?? "")];
+  if (typeof value9 === "function") {
+    setFunctionValue(comment, value9);
+  } else if (value9 != null) {
+    setNodeValue(comment, value9);
+  }
+}
+
+// src/bloom/node/index.ts
+function createFragment(nodes) {
+  const fragment = document.createDocumentFragment();
+  fragment.append(...nodes);
+  return fragment;
+}
+function createNode(value10) {
+  if (value10 instanceof Node) {
+    return value10;
+  }
+  return isBloom(value10) ? value10.grow() : document.createTextNode(String(value10));
 }
 function createNodes(html) {
   const template = document.createElement("template");
   template.innerHTML = html;
   const cloned = template.content.cloneNode(true);
-  const scripts = Array.from(cloned instanceof Element ? cloned.querySelectorAll("script") : []);
+  const scripts = [
+    ...cloned instanceof Element ? cloned.querySelectorAll("script") : []
+  ];
   for (const script of scripts) {
     script.remove();
   }
   cloned.normalize();
   return cloned;
 }
-var getIndex2 = function(value9) {
-  const [, index] = /^bloom\.(\d+)$/.exec(value9) ?? [];
+function getIndex2(value10) {
+  const [, index] = /^bloom\.(\d+)$/.exec(value10) ?? [];
   return index == null ? -1 : +index;
-};
+}
+function getNodes(node) {
+  return /^documentfragment$/i.test(node.constructor.name) ? [...node.childNodes] : [node];
+}
 function mapNodes(values, node) {
-  const children = Array.from(node.childNodes);
+  const children = [...node.childNodes];
   const { length } = children;
   let index = 0;
   for (;index < length; index += 1) {
@@ -329,36 +498,6 @@ function mapNodes(values, node) {
   }
   return node;
 }
-var setFunction = function(comment, callback) {
-  const value9 = callback();
-  (isReactive(value9) ? setReactive : setNode)(comment, value9);
-};
-var setNode = function(comment, value9) {
-  const node = createNode(value9);
-  comment.replaceWith(.../^documentfragment$/i.test(node.constructor.name) ? [...node.childNodes] : [node]);
-};
-var setReactive = function(comment, reactive3) {
-  const text = document.createTextNode("");
-  const fx = effect(() => {
-    const value9 = reactive3.get();
-    text.textContent = String(value9);
-    if (value9 == null && text.parentNode != null) {
-      text.replaceWith(comment);
-    } else if (value9 != null && text.parentNode == null) {
-      comment.replaceWith(text);
-    }
-  });
-  storeNode(comment, { effect: fx });
-  storeNode(text, { effect: fx });
-};
-var setValue2 = function(values, comment) {
-  const value9 = values[getIndex2(comment.nodeValue ?? "")];
-  if (typeof value9 === "function") {
-    setFunction(comment, value9);
-  } else if (value9 != null) {
-    setNode(comment, value9);
-  }
-};
 
 // src/bloom/index.ts
 function bloom(strings, ...expressions) {
@@ -366,17 +505,40 @@ function bloom(strings, ...expressions) {
     expressions,
     strings,
     html: "",
+    nodes: [],
     values: []
   };
   const instance = Object.create({
     grow() {
+      this.wither();
       const html2 = getHtml(data);
       const nodes = createNodes(html2);
-      return mapNodes(data.values, nodes);
+      data.nodes.push(...mapNodes(data.values, nodes).childNodes);
+      return createFragment(data.nodes);
+    },
+    identify(identifier) {
+      data.identifier ??= identifier;
+      return instance;
+    },
+    wither() {
+      const nodes = data.nodes.splice(0);
+      for (const node2 of nodes) {
+        disableStoredNode(node2, true);
+      }
+      return this;
     }
   });
-  Object.defineProperty(instance, "$bloom", {
-    value: true
+  Object.defineProperties(instance, {
+    $bloom: {
+      get() {
+        return true;
+      }
+    },
+    id: {
+      get() {
+        return data.identifier;
+      }
+    }
   });
   return instance;
 }
@@ -400,12 +562,12 @@ class Controller {
 }
 
 // src/petal/observer/attributes/data.attribute.ts
-function handleDataAttribute(context, name, value9) {
+function handleDataAttribute(context, name, value10) {
   let data;
   try {
-    data = JSON.parse(value9);
+    data = JSON.parse(value10);
   } catch (_) {
-    data = value9;
+    data = value10;
   }
   context.data.value[name] = data;
 }
@@ -425,7 +587,7 @@ function createObserver(element, options, attributeHandler) {
   });
   const instance = Object.create({
     handleElement(element2, added) {
-      const attributes = Array.from(element2.attributes);
+      const attributes = [...element2.attributes];
       for (const attribute3 of attributes) {
         attributeHandler(element2, attribute3.name, "", added);
       }
@@ -483,27 +645,27 @@ function observeController(context) {
 
 // src/petal/store/action.store.ts
 function createActions() {
-  const store5 = new Map;
+  const store7 = new Map;
   return Object.create({
     add(name, element) {
-      const action = store5.get(name);
+      const action = store7.get(name);
       if (action != null) {
         action.targets.add(element);
         element.addEventListener(action.type, action.callback, action.options);
       }
     },
     clear() {
-      for (const [, action] of store5) {
+      for (const [, action] of store7) {
         for (const target of action.targets) {
           target.removeEventListener(action.type, action.callback, action.options);
         }
         action.targets.clear();
       }
-      store5.clear();
+      store7.clear();
     },
     create(parameters) {
-      if (!store5.has(parameters.name)) {
-        store5.set(parameters.name, {
+      if (!store7.has(parameters.name)) {
+        store7.set(parameters.name, {
           callback: parameters.callback,
           options: parameters.options,
           targets: new Set,
@@ -512,15 +674,15 @@ function createActions() {
       }
     },
     has(name) {
-      return store5.has(name);
+      return store7.has(name);
     },
     remove(name, element) {
-      const action = store5.get(name);
+      const action = store7.get(name);
       if (action != null) {
         element.removeEventListener(action.type, action.callback);
         action.targets.delete(element);
         if (action.targets.size === 0) {
-          store5.delete(name);
+          store7.delete(name);
         }
       }
     }
@@ -528,21 +690,21 @@ function createActions() {
 }
 
 // node_modules/@oscarpalmer/atoms/dist/js/string.mjs
-var getString2 = function(value9) {
-  if (typeof value9 === "string") {
-    return value9;
+var getString2 = function(value10) {
+  if (typeof value10 === "string") {
+    return value10;
   }
-  if (typeof value9 !== "object" || value9 == null) {
-    return String(value9);
+  if (typeof value10 !== "object" || value10 == null) {
+    return String(value10);
   }
-  const valueOff = value9.valueOf?.() ?? value9;
+  const valueOff = value10.valueOf?.() ?? value10;
   const asString = valueOff?.toString?.() ?? String(valueOff);
-  return asString.startsWith("[object ") ? JSON.stringify(value9) : asString;
+  return asString.startsWith("[object ") ? JSON.stringify(value10) : asString;
 };
 
 // node_modules/@oscarpalmer/atoms/dist/js/is.mjs
-var isNullableOrWhitespace = function(value9) {
-  return value9 == null || /^\s*$/.test(getString2(value9));
+var isNullableOrWhitespace = function(value10) {
+  return value10 == null || /^\s*$/.test(getString2(value10));
 };
 
 // src/petal/store/data.store.ts
@@ -570,18 +732,18 @@ function createData(identifier, context) {
   const instance = Object.create(null);
   Object.defineProperty(instance, "value", {
     value: new Proxy({}, {
-      set(target, property, value9) {
+      set(target, property, value10) {
         const previous = getString2(Reflect.get(target, property));
-        const next = getString2(value9);
+        const next = getString2(value10);
         if (Object.is(previous, next)) {
           return true;
         }
-        const result = Reflect.set(target, property, value9);
+        const result = Reflect.set(target, property, value10);
         if (result) {
           const name = String(property);
           cancelAnimationFrame(frames[name]);
           frames[name] = requestAnimationFrame(() => {
-            setValue3(context, prefix, name, value9, next);
+            setValue3(context, prefix, name, value10, next);
           });
         }
         return result;
@@ -593,27 +755,27 @@ function createData(identifier, context) {
 
 // src/petal/store/target.store.ts
 function createTargets() {
-  const store5 = new Map;
+  const store7 = new Map;
   const instance = Object.create({
     add(name, element) {
-      let targets = store5.get(name);
+      let targets = store7.get(name);
       if (targets == null) {
         targets = new Set;
-        store5.set(name, targets);
+        store7.set(name, targets);
       }
       targets.add(element);
     },
     clear() {
-      for (const [, targets] of store5) {
+      for (const [, targets] of store7) {
         targets.clear();
       }
-      store5.clear();
+      store7.clear();
     },
     get(name) {
-      return Array.from(store5.get(name) ?? []);
+      return [...store7.get(name) ?? []];
     },
     remove(name, element) {
-      store5.get(name)?.delete(element);
+      store7.get(name)?.delete(element);
     }
   });
   return instance;
@@ -719,68 +881,68 @@ var defaultEvents = {
 var pattern = /^(?:(\w+)@)?(\w+)(?::([a-z:]+))?$/i;
 
 // src/petal/observer/attributes/target.attribute.ts
-function handleInputAttribute(element, _, value9, added) {
-  handleTarget(element, value9, added, attributeTargetPattern, handleInput);
+function handleInputAttribute(element, _, value10, added) {
+  handleTarget(element, value10, added, attributeTargetPattern, handleInput);
 }
-function handleOutputAttribute(element, _, value9, added) {
-  handleTarget(element, value9, added, attributeTargetPattern, handleOutput);
+function handleOutputAttribute(element, _, value10, added) {
+  handleTarget(element, value10, added, attributeTargetPattern, handleOutput);
 }
-function handleTarget(element, value9, added, pattern2, callback) {
-  const [, identifier, controller3, name] = pattern2.exec(value9) ?? [];
+function handleTarget(element, value10, added, pattern2, callback) {
+  const [, identifier, controller3, name] = pattern2.exec(value10) ?? [];
   if (controller3 == null || name == null) {
     return;
   }
-  let identified;
+  let identified2;
   if (identifier == null) {
-    identified = element.closest(`[data-petal*="${controller3}"]`);
+    identified2 = element.closest(`[data-petal*="${controller3}"]`);
   } else {
-    identified = document.querySelector(`#${identifier}`);
+    identified2 = document.querySelector(`#${identifier}`);
   }
-  if (identified == null) {
+  if (identified2 == null) {
     return;
   }
-  const context2 = controllers.get(controller3)?.instances.get(identified);
+  const context2 = controllers.get(controller3)?.instances.get(identified2);
   if (context2 != null) {
     callback(context2, element, "", name, added);
   }
 }
-function handleTargetAttribute(element, _, value9, added) {
-  handleTarget(element, value9, added, attributeTargetPattern, handleTargetElement);
+function handleTargetAttribute(element, _, value10, added) {
+  handleTarget(element, value10, added, attributeTargetPattern, handleTargetElement);
 }
-var handleInput = function(context2, element, _, value9, added) {
+var handleInput = function(context2, element, _, value10, added) {
   if (context2 != null && (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
     const checkbox = element.getAttribute("type") === "checkbox";
     handleAction(context2, element, "", "input", added, (event5) => {
-      context2.data.value[value9] = checkbox ? event5.target.checked : event5.target.value;
+      context2.data.value[value10] = checkbox ? event5.target.checked : event5.target.value;
     });
-    handleTargetElement(context2, element, "", `input:${value9}`, added);
+    handleTargetElement(context2, element, "", `input:${value10}`, added);
   }
 };
-var handleOutput = function(context2, element, _, value9, added) {
-  handleTargetElement(context2, element, "", `output:${value9}`, added);
+var handleOutput = function(context2, element, _, value10, added) {
+  handleTargetElement(context2, element, "", `output:${value10}`, added);
 };
-var handleTargetElement = function(context2, element, _, value9, added) {
+var handleTargetElement = function(context2, element, _, value10, added) {
   if (added) {
-    context2.targets.add(value9, element);
+    context2.targets.add(value10, element);
   } else {
-    context2.targets.remove(value9, element);
+    context2.targets.remove(value10, element);
   }
 };
 
 // src/petal/observer/attributes/action.attribute.ts
-function handleAction(context2, element, _, value9, added, handler) {
-  if (context2.actions.has(value9)) {
+function handleAction(context2, element, _, value10, added, handler) {
+  if (context2.actions.has(value10)) {
     if (added) {
-      context2.actions.add(value9, element);
+      context2.actions.add(value10, element);
     } else {
-      context2.actions.remove(value9, element);
+      context2.actions.remove(value10, element);
     }
     return;
   }
   if (!added) {
     return;
   }
-  const parameters = getEventParameters(element, value9);
+  const parameters = getEventParameters(element, value10);
   if (parameters == null) {
     return;
   }
@@ -788,16 +950,16 @@ function handleAction(context2, element, _, value9, added, handler) {
   if (typeof callback === "function") {
     context2.actions.create({
       callback: callback.bind(context2.controller),
-      name: value9,
+      name: value10,
       options: parameters.options,
       target: element,
       type: parameters.type
     });
-    context2.actions.add(value9, element);
+    context2.actions.add(value10, element);
   }
 }
-function handleActionAttribute(element, _, value9, added) {
-  handleTarget(element, value9, added, attributeActionPattern, handleAction);
+function handleActionAttribute(element, _, value10, added) {
+  handleTarget(element, value10, added, attributeActionPattern, handleAction);
 }
 
 // src/petal/observer/attributes/index.ts
@@ -810,9 +972,9 @@ var getChanges = function(from, to) {
     const other = outer === 1 ? fromValues : toValues;
     const { length } = values;
     for (let inner = 0;inner < length; inner += 1) {
-      const value9 = values[inner];
-      if (!other.includes(value9)) {
-        attributes2[outer].push(value9);
+      const value10 = values[inner];
+      if (!other.includes(value10)) {
+        attributes2[outer].push(value10);
       }
     }
   }
@@ -848,11 +1010,11 @@ var handleChanges = function(parameters) {
     }
   }
 };
-function handleControllerAttribute(element, _, value9, added) {
+function handleControllerAttribute(element, _, value10, added) {
   if (added) {
-    addController(value9, element);
+    addController(value10, element);
   } else {
-    removeController(value9, element);
+    removeController(value10, element);
   }
 }
 function handleAttributes(context2) {
@@ -867,15 +1029,15 @@ function handleAttributes(context2) {
   for (const attribute3 of attributes2) {
     const index = attributes2.indexOf(attribute3);
     const callback = callbacks[index];
-    const value9 = index === 0 ? values[0] : values[1];
-    const targets = document.querySelectorAll(`[data-${attribute3}*="${value9}"]`);
+    const value10 = index === 0 ? values[0] : values[1];
+    const targets = document.querySelectorAll(`[data-${attribute3}*="${value10}"]`);
     if (targets.length === 0) {
       continue;
     }
     for (const target4 of targets) {
-      const attributes3 = Array.from(target4.attributes);
+      const attributes3 = [...target4.attributes];
       for (const attribute4 of attributes3) {
-        if (attribute4.value.includes(value9)) {
+        if (attribute4.value.includes(value10)) {
           callback(target4, "", attribute4.value, true);
         }
       }
@@ -908,13 +1070,13 @@ function observeDocument() {
   return createObserver(document.body, {
     ...options,
     attributeFilter: attributes3
-  }, (element, name, value9, added) => {
+  }, (element, name, value10, added) => {
     handleAttributeChanges({
       added,
       callbacks,
       element,
       name,
-      value: value9
+      value: value10
     });
   });
 }

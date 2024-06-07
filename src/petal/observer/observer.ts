@@ -46,7 +46,7 @@ export function createObserver(
 
 	const instance: Observer = Object.create({
 		handleElement(element: Element, added: boolean) {
-			const attributes = Array.from(element.attributes);
+			const attributes = [...element.attributes];
 
 			for (const attribute of attributes) {
 				attributeHandler(element, attribute.name, '', added);

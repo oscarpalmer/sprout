@@ -28,7 +28,7 @@ export function createTargets(): Targets {
 			store.clear();
 		},
 		get(name) {
-			return Array.from(store.get(name) ?? []);
+			return [...(store.get(name) ?? [])];
 		},
 		remove(name, element) {
 			store.get(name)?.delete(element);
