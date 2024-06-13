@@ -5,7 +5,7 @@ import {
 	isArray,
 	isReactive,
 } from '@oscarpalmer/sentinel';
-import {isBloom} from '../helpers/is';
+import {isBloom} from '../helpers/is.helper';
 import type {Bloom, IdentifiedNodes} from '../models';
 import {storeNode} from '../store';
 import {

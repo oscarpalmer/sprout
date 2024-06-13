@@ -1,6 +1,6 @@
 import {type Effect, isEffect} from '@oscarpalmer/sentinel';
-import {addEvent} from '../helpers/event';
-import {isBadAttribute} from '../helpers/is';
+import {addEvent} from '../helpers/event.helper';
+import {isBadAttribute} from '../helpers/is.helper';
 import type {ProperElement} from '../models';
 import {storeNode} from '../store';
 import {setAnyAttribute} from './any.attribute';

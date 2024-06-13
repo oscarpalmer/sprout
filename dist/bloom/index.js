@@ -1,4 +1,4 @@
-// src/bloom/helpers/is.ts
+// src/bloom/helpers/is.helper.ts
 function isBadAttribute(attribute) {
   const { name, value } = attribute;
   return /^on/i.test(name) || /^(href|src|xlink:href)$/i.test(name) && /(data:text\/html|javascript:)/i.test(value);
@@ -211,7 +211,7 @@ var updateStoredNodes = function(type, node, clear) {
 };
 var store3 = new WeakMap;
 
-// src/bloom/helpers/event.ts
+// src/bloom/helpers/event.helper.ts
 function addEvent(element, attribute, value10) {
   element.removeAttribute(attribute);
   if (typeof value10 === "function") {
