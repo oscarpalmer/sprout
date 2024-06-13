@@ -1,6 +1,6 @@
 import {mapAttributes} from '../attribute/index';
 import {isBloom} from '../helpers/is.helper';
-import {setValue} from './value';
+import {setValue} from './value.node';
 
 export function createFragment(nodes: Node[]): DocumentFragment {
 	const fragment = document.createDocumentFragment();

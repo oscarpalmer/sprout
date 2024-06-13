@@ -419,7 +419,7 @@ function compareArrayOrder(first, second) {
   return firstIsLarger ? "removed" : "added";
 }
 
-// src/bloom/node/identified.ts
+// src/bloom/node/identified.node.ts
 function createIdentified(template) {
   return {
     identifier: template.id,
@@ -473,7 +473,7 @@ function updateIdentified(identified, identifiers, templates) {
   return observed;
 }
 
-// src/bloom/node/value.ts
+// src/bloom/node/value.node.ts
 var setFunctionValue = function(comment, callback) {
   const value10 = callback();
   (isReactive(value10) ? setReactiveValue : setNodeValue)(comment, value10);

@@ -13,7 +13,7 @@ import {
 	createIdentifieds,
 	replaceIdentified,
 	updateIdentified,
-} from './identified';
+} from './identified.node';
 import {createNode, getIndex, getNodes} from './index';
 
 function setFunctionValue(comment: Comment, callback: () => unknown): void {
