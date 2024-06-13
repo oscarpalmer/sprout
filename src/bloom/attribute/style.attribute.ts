@@ -1,15 +1,11 @@
 import {type Effect, effect, isReactive} from '@oscarpalmer/sentinel';
-import {isStylableElement} from '../helpers/is';
+import type {ProperElement} from '../models';
 
 export function setStyle(
-	element: Element,
+	element: ProperElement,
 	name: string,
 	value: unknown,
 ): Effect | undefined {
-	if (!isStylableElement(element)) {
-		return;
-	}
-
 	const [, first, second] = name.split('.');
 
 	const property = first.trim();
@@ -29,7 +25,7 @@ export function setStyle(
 }
 
 function updateStyleProperty(
-	element: HTMLElement | SVGElement,
+	element: ProperElement,
 	property: string,
 	suffix: string | undefined,
 	value: unknown,

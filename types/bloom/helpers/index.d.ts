@@ -1,1 +1,2 @@
-export declare function compareArrayOrder(first: (number | string)[], second: (number | string)[]): 'added' | 'dissimilar' | 'removed';
+import type { Key } from '@oscarpalmer/atoms/models';
+export declare function compareArrayOrder(first: Key[], second: Key[]): 'added' | 'dissimilar' | 'removed';

@@ -26,7 +26,7 @@ export function bloom(
 
 			return createFragment(data.nodes);
 		},
-		identify(identifier: number | string) {
+		identify(identifier) {
 			data.identifier ??= identifier;
 
 			return instance;

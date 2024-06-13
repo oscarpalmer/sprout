@@ -1,14 +1,16 @@
 import {type Effect, effect, isReactive} from '@oscarpalmer/sentinel';
+import type {ProperElement} from '../models';
 
 export function setClasses(
-	element: Element,
+	element: ProperElement,
 	name: string,
 	value: unknown,
 ): Effect | undefined {
 	const classes = name
 		.split('.')
 		.slice(1)
-		.filter(name => name.length > 0);
+		.filter(name => name.length > 0)
+		.filter((name, index, array) => array.indexOf(name) === index);
 
 	if (classes.length === 0) {
 		return;

@@ -1,6 +1,8 @@
+import type {Key} from '@oscarpalmer/atoms/models';
+
 export function compareArrayOrder(
-	first: (number | string)[],
-	second: (number | string)[],
+	first: Key[],
+	second: Key[],
 ): 'added' | 'dissimilar' | 'removed' {
 	const firstIsLarger = first.length > second.length;
 	const from = firstIsLarger ? first : second;

@@ -4,13 +4,15 @@
 		"url": "https://oscarpalmer.se"
 	},
 	"dependencies": {
-		"@oscarpalmer/atoms": "^0.37.0",
-		"@oscarpalmer/sentinel": "^0.18.2"
+		"@oscarpalmer/atoms": "^0.50.0",
+		"@oscarpalmer/sentinel": "^0.21.1"
 	},
 	"description": "… sprouting like a cute little weird flower",
 	"devDependencies": {
-		"@biomejs/biome": "^1.8.0",
-		"bun": "^1.1.12",
+		"@biomejs/biome": "^1.8.1",
+		"@happy-dom/global-registrator": "^14.12.0",
+		"@types/bun": "^1.1.4",
+		"bun": "^1.1.13",
 		"typescript": "^5.4.5"
 	},
 	"exports": {
@@ -49,11 +51,11 @@
 	"scripts": {
 		"build": "bun run clean && bunx bun ./.bun.ts && bunx bun ./.bun.ts --mjs && bun run types",
 		"clean": "rm -rf ./dist && rm -rf ./types && rm -rf ./tsconfig.tsbuildinfo",
-		"test": "bun test",
+		"test": "bun test --preload ./test/_preload.ts --coverage",
 		"types": "bunx tsc -p ./tsconfig.json",
 		"watch": "bun build ./src/index.ts --outfile ./dist/index.js --watch"
 	},
 	"type": "module",
 	"types": "./types/index.d.ts",
-	"version": "0.14.0"
+	"version": "0.15.0"
 }

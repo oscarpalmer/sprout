@@ -1,32 +1,37 @@
 import {type Effect, isEffect} from '@oscarpalmer/sentinel';
 import {addEvent} from '../helpers/event';
 import {isBadAttribute} from '../helpers/is';
+import type {ProperElement} from '../models';
 import {storeNode} from '../store';
-import {booleanAttributes, setAny} from './any';
-import {setClasses} from './classes';
-import {setStyle} from './style';
+import {setAnyAttribute} from './any.attribute';
+import {booleanAttributes} from './boolean.attribute';
+import {setClasses} from './class.attribute';
+import {setDataAttribute} from './data.attribute';
+import {setStyle} from './style.attribute';
 
-function getAttributeEffect(
+function getAttributeCallback(
 	name: string,
 	allowAny: boolean,
 ):
 	| ((
-			element: Element,
+			element: ProperElement,
 			name: string,
 			value: unknown,
-			isBoolean?: boolean,
 	  ) => Effect | undefined)
 	| undefined {
 	switch (true) {
 		case /^class\.\w/.test(name):
 			return setClasses;
 
+		case /^data-\w/.test(name):
+			return setDataAttribute;
+
 		case /^style\.\w/.test(name):
 			return setStyle;
 
 		case allowAny:
 		case booleanAttributes.has(name):
-			return setAny;
+			return setAnyAttribute;
 
 		default:
 			break;
@@ -51,26 +56,45 @@ export function mapAttributes(values: unknown[], element: Element): void {
 
 		const badAttribute = isBadAttribute(attribute);
 
-		if (badAttribute) {
-			element.removeAttribute(attribute.name);
+		switch (true) {
+			case badAttribute:
+				element.removeAttribute(attribute.name);
+				continue;
 
-			continue;
+			case attribute.name.startsWith('@'):
+				addEvent(element, attribute.name, value);
+				continue;
+
+			case element instanceof HTMLElement || element instanceof SVGElement:
+				setAttribute(element, attribute, value);
+				continue;
+
+			default:
+				continue;
 		}
+	}
+}
 
-		if (attribute.name.startsWith('@')) {
-			addEvent(element, attribute.name, value);
-		} else {
-			const isFunction = typeof value === 'function';
+function setAttribute(
+	element: ProperElement,
+	attribute: Attr,
+	value: unknown,
+): void {
+	const isFunction = typeof value === 'function';
 
-			const fx = getAttributeEffect(attribute.name, isFunction)?.(
-				element,
-				attribute.name,
-				isFunction ? value() : attribute.value,
-			);
+	const callback = getAttributeCallback(attribute.name, isFunction);
 
-			if (isEffect(fx)) {
-				storeNode(element, {effect: fx});
-			}
-		}
+	if (callback != null) {
+		element.removeAttribute(attribute.name);
+	}
+
+	const fx = callback?.(
+		element,
+		attribute.name,
+		isFunction ? value() : attribute.value,
+	);
+
+	if (isEffect(fx)) {
+		storeNode(element, {effect: fx});
 	}
 }

@@ -1,4 +1,10 @@
-import {effect, isList, isReactive, type Reactive} from '@oscarpalmer/sentinel';
+import type {Key} from '@oscarpalmer/atoms';
+import {
+	type Reactive,
+	effect,
+	isArray,
+	isReactive,
+} from '@oscarpalmer/sentinel';
 import {isBloom} from '../helpers/is';
 import type {Bloom, IdentifiedNodes} from '../models';
 import {storeNode} from '../store';
@@ -43,7 +49,7 @@ function setReactiveList(comment: Comment, reactive: Reactive): void {
 			item => isBloom(item) && item.id != null,
 		) as Bloom[];
 
-		const identifiers = templates.map(item => item.id) as (number | string)[];
+		const identifiers = templates.map(item => item.id) as Key[];
 
 		if (new Set(identifiers).size !== identifiers.length) {
 			templates = [];
@@ -82,7 +88,7 @@ function setReactiveText(comment: Comment, reactive: Reactive): void {
 }
 
 function setReactiveValue(comment: Comment, reactive: Reactive): void {
-	if (isList(reactive) || Array.isArray(reactive.peek())) {
+	if (isArray(reactive) || Array.isArray(reactive.peek())) {
 		setReactiveList(comment, reactive);
 	} else {
 		setReactiveText(comment, reactive);

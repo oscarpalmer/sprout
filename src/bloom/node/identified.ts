@@ -1,3 +1,4 @@
+import type {Key} from '@oscarpalmer/atoms/models';
 import {compareArrayOrder} from '../helpers';
 import type {Bloom, IdentifiedNodes} from '../models';
 import {disableStoredNode} from '../store';
@@ -36,7 +37,7 @@ export function replaceIdentified(
 
 export function updateIdentified(
 	identified: IdentifiedNodes[],
-	identifiers: (number | string)[],
+	identifiers: Key[],
 	templates: Bloom[],
 ): IdentifiedNodes[] {
 	const observed: IdentifiedNodes[] = [];

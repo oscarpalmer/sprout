@@ -1,8 +1,9 @@
+import type {Key} from '@oscarpalmer/atoms/models';
 import type {Effect} from '@oscarpalmer/sentinel';
 
 export type BloomData = {
 	expressions: unknown[];
-	identifier?: number | string;
+	identifier?: Key;
 	html: string;
 	nodes: Node[];
 	strings: TemplateStringsArray;
@@ -13,7 +14,7 @@ export type Bloom = {
 	/**
 	 * The identifier of the Bloom
 	 */
-	readonly id?: number | string;
+	readonly id?: Key;
 	/**
 	 * Renders and returns the Bloom
 	 */
@@ -21,7 +22,7 @@ export type Bloom = {
 	/**
 	 * Sets the identifier of the Bloom
 	 */
-	identify(identifier: number | string): Bloom;
+	identify(identifier: Key): Bloom;
 	/**
 	 * Destroys the Bloom
 	 */
@@ -39,9 +40,11 @@ export type EventParameters = {
 };
 
 export type IdentifiedNodes = {
-	identifier?: number | string;
+	identifier?: Key;
 	nodes: ChildNode[];
 };
+
+export type ProperElement = HTMLElement | SVGElement;
 
 export type StoredData = {
 	effects: Set<Effect>;
