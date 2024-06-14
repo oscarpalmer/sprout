@@ -13,9 +13,3 @@ export function isBadAttribute(attribute: Attr): boolean {
 export function isBloom(value: unknown): value is Bloom {
 	return (value as Record<string, unknown>)?.$bloom === true;
 }
-
-export function isStylableElement(
-	element: Element,
-): element is HTMLElement | SVGElement {
-	return element instanceof HTMLElement || element instanceof SVGElement;
-}

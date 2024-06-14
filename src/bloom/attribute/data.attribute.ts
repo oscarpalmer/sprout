@@ -10,11 +10,13 @@ export function setDataAttribute(
 	const kebabCased = name.split('-').slice(1).join('-');
 	const camelCased = camelCase(kebabCased);
 
-	if (isReactive(value)) {
-		return effect(() => setValue(element, camelCased, value.get()));
-	}
+	if (camelCased.length > 0) {
+		if (isReactive(value)) {
+			return effect(() => setValue(element, camelCased, value.get()));
+		}
 
-	setValue(element, camelCased, value);
+		setValue(element, camelCased, value);
+	}
 }
 
 function setValue(element: ProperElement, key: string, value: unknown): void {

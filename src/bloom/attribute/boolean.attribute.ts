@@ -1,4 +1,5 @@
 import type {PlainObject} from '@oscarpalmer/atoms/models';
+import {getString} from '@oscarpalmer/atoms/string';
 import type {ProperElement} from '../models';
 
 export const booleanAttributes = new Set([
@@ -8,7 +9,7 @@ export const booleanAttributes = new Set([
 	'inert',
 	'multiple',
 	'open',
-	'readonly',
+	'readOnly',
 	'required',
 	'selected',
 ]);
@@ -20,7 +21,9 @@ export function setBooleanAttribute(
 	name: string,
 	value: unknown,
 ): void {
-	(element as unknown as PlainObject)[name] = /^(|true)$/i.test(String(value));
+	(element as unknown as PlainObject)[name] = /^(|true)$/i.test(
+		getString(value),
+	);
 }
 
 export function setSelectedAttribute(element: ProperElement) {

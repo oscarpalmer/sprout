@@ -18,3 +18,9 @@ export function compareArrayOrder(
 
 	return firstIsLarger ? 'removed' : 'added';
 }
+
+export function getExpressionIndex(value: string): number {
+	const [, index] = /^(?:<!--|)bloom\.(\d+)(?:|-->)$/.exec(value) ?? [];
+
+	return index == null ? -1 : +index;
+}

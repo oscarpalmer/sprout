@@ -1,3 +1,4 @@
+import {getString} from '@oscarpalmer/atoms/string';
 import {type Effect, effect, isReactive} from '@oscarpalmer/sentinel';
 import type {ProperElement} from '../models';
 import {
@@ -11,20 +12,21 @@ export function setAnyAttribute(
 	name: string,
 	value: unknown,
 ): Effect | undefined {
-	const isBoolean = booleanAttributes.has(name) && name in element;
-	const isValue = name === 'value' && name in element;
+	const property = name === 'readonly' ? 'readOnly' : name;
+	const isBoolean = booleanAttributes.has(property) && property in element;
+	const isValue = property === 'value' && property in element;
 
 	const callback = isBoolean
-		? name === 'selected'
-			? setSelectedAttribute
+		? property === 'selected'
+			? setSelectedAttribute(element)
 			: setBooleanAttribute
 		: setAttribute;
 
 	if (isReactive(value)) {
-		return effect(() => callback(element, name, value.get(), isValue));
+		return effect(() => callback(element, property, value.get(), isValue));
 	}
 
-	callback(element, name, value, isValue);
+	callback(element, property, value, isValue);
 }
 
 function setAttribute(
@@ -35,12 +37,13 @@ function setAttribute(
 ): void {
 	switch (true) {
 		case isValue:
-			(element as HTMLInputElement).value = String(value);
+			(element as HTMLInputElement).value =
+				value == null ? '' : getString(value);
 			break;
 		case value == null:
 			element.removeAttribute(name);
 			break;
 		default:
-			element.setAttribute(name, String(value));
+			element.setAttribute(name, getString(value));
 	}
 }

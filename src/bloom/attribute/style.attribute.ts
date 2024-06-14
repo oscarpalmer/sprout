@@ -1,27 +1,38 @@
+import {camelCase, getString} from '@oscarpalmer/atoms/string';
 import {type Effect, effect, isReactive} from '@oscarpalmer/sentinel';
 import type {ProperElement} from '../models';
+
+function getProperty(
+	element: ProperElement,
+	property: string,
+): string | undefined {
+	if (property in element.style) {
+		return property;
+	}
+
+	const camelCased = camelCase(property);
+
+	return camelCased in element.style ? camelCased : undefined;
+}
 
 export function setStyle(
 	element: ProperElement,
 	name: string,
 	value: unknown,
 ): Effect | undefined {
-	const [, first, second] = name.split('.');
+	const [, property, suffix] = name.split('.');
 
-	const property = first.trim();
-	const suffix = second?.trim();
+	const existing = getProperty(element, property);
 
-	if (property.length === 0 || (suffix != null && suffix.length === 0)) {
-		return;
+	if (existing != null) {
+		if (isReactive(value)) {
+			return effect(() =>
+				updateStyleProperty(element, existing, suffix, value.get()),
+			);
+		}
+
+		updateStyleProperty(element, existing, suffix, value);
 	}
-
-	if (isReactive(value)) {
-		return effect(() =>
-			updateStyleProperty(element, property, suffix, value.get()),
-		);
-	}
-
-	updateStyleProperty(element, property, suffix, value);
 }
 
 function updateStyleProperty(
@@ -31,11 +42,9 @@ function updateStyleProperty(
 	value: unknown,
 ): void {
 	if (value == null || value === false || (value === true && suffix == null)) {
-		element.style.removeProperty(property);
+		element.style[property as never] = '';
 	} else {
-		element.style.setProperty(
-			property,
-			value === true ? String(suffix) : `${value}${suffix ?? ''}`,
-		);
+		element.style[property as never] =
+			value === true ? getString(suffix) : `${value}${suffix ?? ''}`;
 	}
 }

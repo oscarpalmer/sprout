@@ -8,9 +8,7 @@ export function getHtml(data: BloomData): string {
 
 	const {length} = data.strings;
 
-	let index = 0;
-
-	for (; index < length; index += 1) {
+	for (let index = 0; index < length; index += 1) {
 		data.html += getPartial(data, data.strings[index], data.expressions[index]);
 	}
 
@@ -40,9 +38,8 @@ function getPartial(
 		const {length} = expression;
 
 		let html = '';
-		let index = 0;
 
-		for (; index < length; index += 1) {
+		for (let index = 0; index < length; index += 1) {
 			html += getPartial(data, '', expression[index]);
 		}
 

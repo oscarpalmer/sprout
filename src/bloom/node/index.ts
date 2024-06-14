@@ -1,3 +1,4 @@
+import {getString} from '@oscarpalmer/atoms/string';
 import {mapAttributes} from '../attribute/index';
 import {isBloom} from '../helpers/is.helper';
 import {setValue} from './value.node';
@@ -15,7 +16,9 @@ export function createNode(value: unknown): Node {
 		return value;
 	}
 
-	return isBloom(value) ? value.grow() : document.createTextNode(String(value));
+	return isBloom(value)
+		? value.grow()
+		: document.createTextNode(getString(value));
 }
 
 export function createNodes(html: string): Node {
@@ -38,12 +41,6 @@ export function createNodes(html: string): Node {
 	return cloned;
 }
 
-export function getIndex(value: string): number {
-	const [, index] = /^bloom\.(\d+)$/.exec(value) ?? [];
-
-	return index == null ? -1 : +index;
-}
-
 export function getNodes(node: Node): Node[] {
 	return /^documentfragment$/i.test(node.constructor.name)
 		? [...node.childNodes]
@@ -54,9 +51,7 @@ export function mapNodes(values: unknown[], node: Node): Node {
 	const children = [...node.childNodes];
 	const {length} = children;
 
-	let index = 0;
-
-	for (; index < length; index += 1) {
+	for (let index = 0; index < length; index += 1) {
 		const child = children[index];
 
 		if (child.nodeType === 8) {

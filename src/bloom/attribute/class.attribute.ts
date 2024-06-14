@@ -1,3 +1,4 @@
+import {getString} from '@oscarpalmer/atoms/string';
 import {type Effect, effect, isReactive} from '@oscarpalmer/sentinel';
 import type {ProperElement} from '../models';
 
@@ -12,15 +13,13 @@ export function setClasses(
 		.filter(name => name.length > 0)
 		.filter((name, index, array) => array.indexOf(name) === index);
 
-	if (classes.length === 0) {
-		return;
-	}
+	if (classes.length > 0) {
+		if (isReactive(value)) {
+			return effect(() => updateClassList(element, classes, value.get()));
+		}
 
-	if (isReactive(value)) {
-		return effect(() => updateClassList(element, classes, value.get()));
+		updateClassList(element, classes, value);
 	}
-
-	updateClassList(element, classes, value);
 }
 
 function updateClassList(
@@ -28,5 +27,7 @@ function updateClassList(
 	classes: string[],
 	value: unknown,
 ): void {
-	element.classList[value === true ? 'add' : 'remove'](...classes);
+	element.classList[/^true$/i.test(getString(value)) ? 'add' : 'remove'](
+		...classes,
+	);
 }

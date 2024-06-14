@@ -1,10 +1,12 @@
-import type {Key} from '@oscarpalmer/atoms';
+import type {Key} from '@oscarpalmer/atoms/models';
+import {getString} from '@oscarpalmer/atoms/string';
 import {
 	type Reactive,
 	effect,
 	isArray,
 	isReactive,
 } from '@oscarpalmer/sentinel';
+import {getExpressionIndex} from '../helpers';
 import {isBloom} from '../helpers/is.helper';
 import type {Bloom, IdentifiedNodes} from '../models';
 import {storeNode} from '../store';
@@ -14,7 +16,7 @@ import {
 	replaceIdentified,
 	updateIdentified,
 } from './identified.node';
-import {createNode, getIndex, getNodes} from './index';
+import {createNode, getNodes} from './index';
 
 function setFunctionValue(comment: Comment, callback: () => unknown): void {
 	const value = callback();
@@ -51,7 +53,7 @@ function setReactiveList(comment: Comment, reactive: Reactive): void {
 
 		const identifiers = templates.map(item => item.id) as Key[];
 
-		if (new Set(identifiers).size !== identifiers.length) {
+		if (new Set(identifiers).size !== list.length) {
 			templates = [];
 		}
 
@@ -74,7 +76,7 @@ function setReactiveText(comment: Comment, reactive: Reactive): void {
 	const fx = effect(() => {
 		const value = reactive.get();
 
-		text.textContent = String(value);
+		text.textContent = getString(value);
 
 		if (value == null && text.parentNode != null) {
 			text.replaceWith(comment);
@@ -96,7 +98,7 @@ function setReactiveValue(comment: Comment, reactive: Reactive): void {
 }
 
 export function setValue(values: unknown[], comment: Comment): void {
-	const value = values[getIndex(comment.nodeValue ?? '')];
+	const value = values[getExpressionIndex(comment.nodeValue ?? '')];
 
 	if (typeof value === 'function') {
 		setFunctionValue(comment, value as never);

@@ -1,5 +1,10 @@
 import type {StoredData, StoredParameters} from './models';
 
+const callbacks = {
+	disable: removeEventListener,
+	enable: addEventListener,
+};
+
 const store = new WeakMap<Node, StoredData>();
 
 export function disableStoredNode(node: Node, remove?: boolean): void {
@@ -59,12 +64,9 @@ function updateStoredNode(
 			effect[name]();
 		}
 
-		const callback =
-			type === 'disable' ? node.removeEventListener : node.addEventListener;
-
 		for (const [name, listeners] of stored.events) {
 			for (const [listener, data] of listeners) {
-				callback(name, listener, data.options);
+				callbacks[type].call(node, name, listener, data.options);
 			}
 		}
 
@@ -87,9 +89,7 @@ function updateStoredNodes(
 		const children = [...node.childNodes];
 		const {length} = children;
 
-		let index = 0;
-
-		for (; index < length; index += 1) {
+		for (let index = 0; index < length; index += 1) {
 			updateStoredNode(type, children[index], clear);
 		}
 	}

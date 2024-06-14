@@ -1,4 +1,5 @@
 import {type Effect, isEffect} from '@oscarpalmer/sentinel';
+import {getExpressionIndex} from '../helpers';
 import {addEvent} from '../helpers/event.helper';
 import {isBadAttribute} from '../helpers/is.helper';
 import type {ProperElement} from '../models';
@@ -38,21 +39,13 @@ function getAttributeCallback(
 	}
 }
 
-function getIndex(value: string): number {
-	const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value) ?? [];
-
-	return index == null ? -1 : +index;
-}
-
 export function mapAttributes(values: unknown[], element: Element): void {
 	const attributes = [...element.attributes];
 	const {length} = attributes;
 
-	let index = 0;
-
-	for (; index < length; index += 1) {
+	for (let index = 0; index < length; index += 1) {
 		const attribute = attributes[index];
-		const value = values[getIndex(attribute.value)];
+		const value = values[getExpressionIndex(attribute.value)];
 
 		const badAttribute = isBadAttribute(attribute);
 

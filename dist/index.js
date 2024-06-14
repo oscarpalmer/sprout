@@ -13,8 +13,7 @@ function getHtml(data) {
     return data.html;
   }
   const { length } = data.strings;
-  let index = 0;
-  for (;index < length; index += 1) {
+  for (let index = 0;index < length; index += 1) {
     data.html += getPartial(data, data.strings[index], data.expressions[index]);
   }
   return data.html;
@@ -30,13 +29,48 @@ var getPartial = function(data, prefix, expression) {
   if (Array.isArray(expression)) {
     const { length } = expression;
     let html = "";
-    let index = 0;
-    for (;index < length; index += 1) {
+    for (let index = 0;index < length; index += 1) {
       html += getPartial(data, "", expression[index]);
     }
     return `${prefix}${html}`;
   }
   return `${prefix}${expression}`;
+};
+
+// node_modules/@oscarpalmer/atoms/dist/js/is.mjs
+var isNullableOrWhitespace = function(value) {
+  return value == null || /^\s*$/.test(getString(value));
+};
+
+// node_modules/@oscarpalmer/atoms/dist/js/string.mjs
+var camelCase = function(value) {
+  return toCase(value, "", true, false);
+};
+var capitalise = function(value) {
+  if (value.length === 0) {
+    return value;
+  }
+  return value.length === 1 ? value.toLocaleUpperCase() : `${value.charAt(0).toLocaleUpperCase()}${value.slice(1).toLocaleLowerCase()}`;
+};
+var getString = function(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value !== "object" || value == null) {
+    return String(value);
+  }
+  const valueOff = value.valueOf?.() ?? value;
+  const asString = valueOff?.toString?.() ?? String(valueOff);
+  return asString.startsWith("[object ") ? JSON.stringify(value) : asString;
+};
+var words = function(value) {
+  return value.match(/[^\x00-\x2f\x3a-\x40\x5b-\x60\x7b-\x7f]+/g) ?? [];
+};
+var toCase = function(value, delimiter, capitaliseAny, capitaliseFirst) {
+  return words(value).map((word, index) => {
+    const parts = word.replace(/(\p{Lu}*)(\p{Lu})(\p{Ll}+)/gu, (full, one, two, three) => three === "s" ? full : `${one}-${two}${three}`).replace(/(\p{Ll})(\p{Lu})/gu, "$1-$2").split("-");
+    return parts.filter((part) => part.length > 0).map((part, partIndex) => !capitaliseAny || partIndex === 0 && index === 0 && !capitaliseFirst ? part.toLocaleLowerCase() : capitalise(part)).join(delimiter);
+  }).join(delimiter);
 };
 
 // node_modules/@oscarpalmer/atoms/dist/js/queue.mjs
@@ -125,44 +159,23 @@ var arrayOperations = new Set([
   "unshift"
 ]);
 
-// node_modules/@oscarpalmer/atoms/dist/js/string.mjs
-var camelCase = function(value10) {
-  return toCase(value10, "", true, false);
-};
-var capitalise = function(value10) {
-  if (value10.length === 0) {
-    return value10;
-  }
-  return value10.length === 1 ? value10.toLocaleUpperCase() : `${value10.charAt(0).toLocaleUpperCase()}${value10.slice(1).toLocaleLowerCase()}`;
-};
-var getString = function(value10) {
-  if (typeof value10 === "string") {
-    return value10;
-  }
-  if (typeof value10 !== "object" || value10 == null) {
-    return String(value10);
-  }
-  const valueOff = value10.valueOf?.() ?? value10;
-  const asString = valueOff?.toString?.() ?? String(valueOff);
-  return asString.startsWith("[object ") ? JSON.stringify(value10) : asString;
-};
-var words = function(value10) {
-  return value10.match(/[^\x00-\x2f\x3a-\x40\x5b-\x60\x7b-\x7f]+/g) ?? [];
-};
-var toCase = function(value10, delimiter, capitaliseAny, capitaliseFirst) {
-  return words(value10).map((word, index) => {
-    const parts = word.replace(/(\p{Lu}*)(\p{Lu})(\p{Ll}+)/gu, (full, one, two, three) => three === "s" ? full : `${one}-${two}${three}`).replace(/(\p{Ll})(\p{Lu})/gu, "$1-$2").split("-");
-    return parts.filter((part) => part.length > 0).map((part, partIndex) => !capitaliseAny || partIndex === 0 && index === 0 && !capitaliseFirst ? part.toLocaleLowerCase() : capitalise(part)).join(delimiter);
-  }).join(delimiter);
-};
-
-// node_modules/@oscarpalmer/atoms/dist/js/is.mjs
-var isNullableOrWhitespace = function(value10) {
-  return value10 == null || /^\s*$/.test(getString(value10));
-};
-
 // node_modules/@oscarpalmer/sentinel/dist/reactive/index.mjs
 var primitives = new Set(["boolean", "number", "string"]);
+
+// src/bloom/helpers/index.ts
+function compareArrayOrder(first, second) {
+  const firstIsLarger = first.length > second.length;
+  const from = firstIsLarger ? first : second;
+  const to = firstIsLarger ? second : first;
+  if (!from.filter((key) => to.includes(key)).every((key, index) => to[index] === key)) {
+    return "dissimilar";
+  }
+  return firstIsLarger ? "removed" : "added";
+}
+function getExpressionIndex(value10) {
+  const [, index] = /^(?:<!--|)bloom\.(\d+)(?:|-->)$/.exec(value10) ?? [];
+  return index == null ? -1 : +index;
+}
 
 // src/bloom/store.ts
 function disableStoredNode(node, remove) {
@@ -201,10 +214,9 @@ var updateStoredNode = function(type, node, clear) {
     for (const effect5 of stored.effects) {
       effect5[name]();
     }
-    const callback = type === "disable" ? node.removeEventListener : node.addEventListener;
     for (const [name2, listeners] of stored.events) {
       for (const [listener, data] of listeners) {
-        callback(name2, listener, data.options);
+        callbacks[type].call(node, name2, listener, data.options);
       }
     }
     if (clear) {
@@ -219,11 +231,14 @@ var updateStoredNodes = function(type, node, clear) {
   if (node.hasChildNodes()) {
     const children = [...node.childNodes];
     const { length } = children;
-    let index = 0;
-    for (;index < length; index += 1) {
+    for (let index = 0;index < length; index += 1) {
       updateStoredNode(type, children[index], clear);
     }
   }
+};
+var callbacks = {
+  disable: removeEventListener,
+  enable: addEventListener
 };
 var store3 = new WeakMap;
 
@@ -251,7 +266,7 @@ var getParameters = function(attribute) {
 
 // src/bloom/attribute/boolean.attribute.ts
 function setBooleanAttribute(element, name, value10) {
-  element[name] = /^(|true)$/i.test(String(value10));
+  element[name] = /^(|true)$/i.test(getString(value10));
 }
 function setSelectedAttribute(element) {
   const select = element.closest("select");
@@ -275,7 +290,7 @@ var booleanAttributes = new Set([
   "inert",
   "multiple",
   "open",
-  "readonly",
+  "readOnly",
   "required",
   "selected"
 ]);
@@ -283,73 +298,80 @@ var frames = new WeakMap;
 
 // src/bloom/attribute/any.attribute.ts
 function setAnyAttribute(element, name, value10) {
-  const isBoolean = booleanAttributes.has(name) && name in element;
-  const isValue = name === "value" && name in element;
-  const callback = isBoolean ? name === "selected" ? setSelectedAttribute : setBooleanAttribute : setAttribute;
+  const property = name === "readonly" ? "readOnly" : name;
+  const isBoolean = booleanAttributes.has(property) && property in element;
+  const isValue = property === "value" && property in element;
+  const callback = isBoolean ? property === "selected" ? setSelectedAttribute(element) : setBooleanAttribute : setAttribute;
   if (isReactive(value10)) {
-    return effect(() => callback(element, name, value10.get(), isValue));
+    return effect(() => callback(element, property, value10.get(), isValue));
   }
-  callback(element, name, value10, isValue);
+  callback(element, property, value10, isValue);
 }
 var setAttribute = function(element, name, value10, isValue) {
   switch (true) {
     case isValue:
-      element.value = String(value10);
+      element.value = value10 == null ? "" : getString(value10);
       break;
     case value10 == null:
       element.removeAttribute(name);
       break;
     default:
-      element.setAttribute(name, String(value10));
+      element.setAttribute(name, getString(value10));
   }
 };
 
 // src/bloom/attribute/class.attribute.ts
 function setClasses(element, name, value10) {
   const classes = name.split(".").slice(1).filter((name2) => name2.length > 0).filter((name2, index, array4) => array4.indexOf(name2) === index);
-  if (classes.length === 0) {
-    return;
+  if (classes.length > 0) {
+    if (isReactive(value10)) {
+      return effect(() => updateClassList(element, classes, value10.get()));
+    }
+    updateClassList(element, classes, value10);
   }
-  if (isReactive(value10)) {
-    return effect(() => updateClassList(element, classes, value10.get()));
-  }
-  updateClassList(element, classes, value10);
 }
 var updateClassList = function(element, classes, value10) {
-  element.classList[value10 === true ? "add" : "remove"](...classes);
+  element.classList[/^true$/i.test(getString(value10)) ? "add" : "remove"](...classes);
 };
 
 // src/bloom/attribute/data.attribute.ts
 function setDataAttribute(element, name, value10) {
   const kebabCased = name.split("-").slice(1).join("-");
   const camelCased = camelCase(kebabCased);
-  if (isReactive(value10)) {
-    return effect(() => setValue2(element, camelCased, value10.get()));
+  if (camelCased.length > 0) {
+    if (isReactive(value10)) {
+      return effect(() => setValue2(element, camelCased, value10.get()));
+    }
+    setValue2(element, camelCased, value10);
   }
-  setValue2(element, camelCased, value10);
 }
 var setValue2 = function(element, key, value10) {
   element.dataset[key] = JSON.stringify(value10);
 };
 
 // src/bloom/attribute/style.attribute.ts
+var getProperty = function(element, property) {
+  if (property in element.style) {
+    return property;
+  }
+  const camelCased = camelCase(property);
+  return camelCased in element.style ? camelCased : undefined;
+};
 function setStyle(element, name, value10) {
-  const [, first, second] = name.split(".");
-  const property = first.trim();
-  const suffix = second?.trim();
-  if (property.length === 0 || suffix != null && suffix.length === 0) {
-    return;
+  const [, property, suffix] = name.split(".");
+  const existing = getProperty(element, property);
+  if (existing != null) {
+    if (isReactive(value10)) {
+      return effect(() => updateStyleProperty(element, existing, suffix, value10.get()));
+    }
+    updateStyleProperty(element, existing, suffix, value10);
   }
-  if (isReactive(value10)) {
-    return effect(() => updateStyleProperty(element, property, suffix, value10.get()));
-  }
-  updateStyleProperty(element, property, suffix, value10);
 }
 var updateStyleProperty = function(element, property, suffix, value10) {
   if (value10 == null || value10 === false || value10 === true && suffix == null) {
-    element.style.removeProperty(property);
+    element.style[property] = "";
   } else {
-    element.style.setProperty(property, value10 === true ? String(suffix) : `${value10}${suffix ?? ""}`);
+    element.style[property] = value10 === true ? getString(suffix) : `${value10}${suffix ?? ""}`;
   }
 };
 
@@ -369,17 +391,12 @@ var getAttributeCallback = function(name, allowAny) {
       break;
   }
 };
-var getIndex = function(value10) {
-  const [, index] = /^<!--bloom\.(\d+)-->$/.exec(value10) ?? [];
-  return index == null ? -1 : +index;
-};
 function mapAttributes(values, element) {
   const attributes = [...element.attributes];
   const { length } = attributes;
-  let index = 0;
-  for (;index < length; index += 1) {
+  for (let index = 0;index < length; index += 1) {
     const attribute = attributes[index];
-    const value10 = values[getIndex(attribute.value)];
+    const value10 = values[getExpressionIndex(attribute.value)];
     const badAttribute = isBadAttribute(attribute);
     switch (true) {
       case badAttribute:
@@ -407,17 +424,6 @@ var setAttribute2 = function(element, attribute, value10) {
     storeNode(element, { effect: fx });
   }
 };
-
-// src/bloom/helpers/index.ts
-function compareArrayOrder(first, second) {
-  const firstIsLarger = first.length > second.length;
-  const from = firstIsLarger ? first : second;
-  const to = firstIsLarger ? second : first;
-  if (!from.filter((key) => to.includes(key)).every((key, index) => to[index] === key)) {
-    return "dissimilar";
-  }
-  return firstIsLarger ? "removed" : "added";
-}
 
 // src/bloom/node/identified.node.ts
 function createIdentified(template) {
@@ -491,7 +497,7 @@ var setReactiveList = function(comment, reactive3) {
     }
     let templates = list.filter((item) => isBloom(item) && item.id != null);
     const identifiers = templates.map((item) => item.id);
-    if (new Set(identifiers).size !== identifiers.length) {
+    if (new Set(identifiers).size !== list.length) {
       templates = [];
     }
     identified2 = identified2 == null || templates.length === 0 ? replaceIdentified(identified2 ?? [{ nodes: [comment] }], templates.length > 0 ? templates.map((template) => createIdentified(template)) : createIdentifieds(list.map(createNode)), true) : updateIdentified(identified2, identifiers, templates);
@@ -501,7 +507,7 @@ var setReactiveText = function(comment, reactive3) {
   const text = document.createTextNode("");
   const fx = effect(() => {
     const value10 = reactive3.get();
-    text.textContent = String(value10);
+    text.textContent = getString(value10);
     if (value10 == null && text.parentNode != null) {
       text.replaceWith(comment);
     } else if (value10 != null && text.parentNode == null) {
@@ -519,7 +525,7 @@ var setReactiveValue = function(comment, reactive3) {
   }
 };
 function setValue3(values, comment) {
-  const value10 = values[getIndex2(comment.nodeValue ?? "")];
+  const value10 = values[getExpressionIndex(comment.nodeValue ?? "")];
   if (typeof value10 === "function") {
     setFunctionValue(comment, value10);
   } else if (value10 != null) {
@@ -537,7 +543,7 @@ function createNode(value11) {
   if (value11 instanceof Node) {
     return value11;
   }
-  return isBloom(value11) ? value11.grow() : document.createTextNode(String(value11));
+  return isBloom(value11) ? value11.grow() : document.createTextNode(getString(value11));
 }
 function createNodes(html) {
   const template = document.createElement("template");
@@ -552,18 +558,13 @@ function createNodes(html) {
   cloned.normalize();
   return cloned;
 }
-function getIndex2(value11) {
-  const [, index] = /^bloom\.(\d+)$/.exec(value11) ?? [];
-  return index == null ? -1 : +index;
-}
 function getNodes(node) {
   return /^documentfragment$/i.test(node.constructor.name) ? [...node.childNodes] : [node];
 }
 function mapNodes(values, node) {
   const children = [...node.childNodes];
   const { length } = children;
-  let index = 0;
-  for (;index < length; index += 1) {
+  for (let index = 0;index < length; index += 1) {
     const child = children[index];
     if (child.nodeType === 8) {
       setValue3(values, child);
@@ -1081,7 +1082,7 @@ function handleControllerAttribute(element, _, value11, added) {
 }
 function handleAttributes(context2) {
   const attributes2 = ["action", "input", "output", "target"];
-  const callbacks = [
+  const callbacks2 = [
     handleActionAttribute,
     handleInputAttribute,
     handleOutputAttribute,
@@ -1090,7 +1091,7 @@ function handleAttributes(context2) {
   const values = [`->${context2.identifier}@`, `->${context2.identifier}.`];
   for (const attribute3 of attributes2) {
     const index = attributes2.indexOf(attribute3);
-    const callback = callbacks[index];
+    const callback = callbacks2[index];
     const value11 = index === 0 ? values[0] : values[1];
     const targets = document.querySelectorAll(`[data-${attribute3}*="${value11}"]`);
     if (targets.length === 0) {
@@ -1122,7 +1123,7 @@ function observeDocument() {
     outputAttribute,
     targetAttribute
   ];
-  const callbacks = {
+  const callbacks2 = {
     [actionAttribute]: handleActionAttribute,
     [attribute2]: handleControllerAttribute,
     [inputAttribute]: handleInputAttribute,
@@ -1135,7 +1136,7 @@ function observeDocument() {
   }, (element, name, value11, added) => {
     handleAttributeChanges({
       added,
-      callbacks,
+      callbacks: callbacks2,
       element,
       name,
       value: value11
